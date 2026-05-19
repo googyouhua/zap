@@ -278,14 +278,47 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Build CLI
+      # CLI/remote-server tarball 用静态 musl 链接,产物不依赖宿主 glibc,
+      # 可在任意 Linux x86_64 主机(含 CentOS 7 / Amazon Linux 2 等旧 glibc
+      # 以及 Alpine 等 musl 发行版)上运行。GUI AppImage/deb 仍走上面的
+      # glibc 链接构建,不受影响。
+      #
+      # `musl-tools` 只提供 C 编译器 `musl-gcc`,而依赖树里的 `freetype-sys`
+      # 等 *-sys crate 需要 musl 的 C++ 编译器。`musl-gcc` 本身只是个调用宿主
+      # gcc + musl specs 的 shell wrapper,这里照同样方式补一个 `musl-g++`
+      # 包装宿主 g++,并把两者按 cc-rs 期望的 `x86_64-linux-musl-{gcc,g++}`
+      # 三元组命名暴露到 PATH。
+      - name: Install musl toolchain for static CLI build
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y musl-tools
+          rustup target add x86_64-unknown-linux-musl
+          # 生成 musl-g++ wrapper(musl-tools 没有提供)。
+          sudo tee /usr/bin/musl-g++ >/dev/null <<'EOF'
+          #!/bin/sh
+          exec "${REALGXX:-g++}" "$@" -specs "/usr/lib/musl/lib/musl-gcc.specs"
+          EOF
+          sudo chmod +x /usr/bin/musl-g++
+          # cc-rs 默认按 `<triple>-gcc` / `<triple>-g++` 找交叉编译器。
+          sudo ln -sf /usr/bin/musl-gcc /usr/local/bin/x86_64-linux-musl-gcc
+          sudo ln -sf /usr/bin/musl-g++ /usr/local/bin/x86_64-linux-musl-g++
+        shell: bash
+
+      - name: Build CLI (static musl)
         id: bundle_cli
         run: |
-          script/bundle --channel "$CHANNEL" --arch x86_64 --artifact cli --packages none
+          script/bundle --channel "$CHANNEL" --arch x86_64 --artifact cli --packages none \
+            --target x86_64-unknown-linux-musl
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ needs.prepare_metadata.outputs.release_tag }}
           APPIMAGE_EXTRACT_AND_RUN: 1
+          # libc(musl)被 +crt-static 静态链接进二进制 —— 这是让产物摆脱
+          # 宿主 glibc 下限的关键。`libdbus-sys`(经 keyring → dbus-secret-service
+          # 链入)的 build script 用 pkg-config 探测 `dbus-1`;交叉编译时它默认
+          # 拒绝使用宿主 .pc 文件,这里放行(上面的 "Install extra dependencies"
+          # 步骤已装 libdbus-1-dev 提供 .pc 与头文件)。
+          PKG_CONFIG_ALLOW_CROSS: 1
 
       - name: Package CLI tarball
         run: |

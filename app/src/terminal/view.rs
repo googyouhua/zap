@@ -4110,6 +4110,7 @@ impl TerminalView {
                     | RemoteServerManagerEvent::HostDisconnected { .. }
                     | RemoteServerManagerEvent::RepoMetadataSnapshot { .. }
                     | RemoteServerManagerEvent::RepoMetadataUpdated { .. }
+                    | RemoteServerManagerEvent::BufferUpdated { .. }
                     | RemoteServerManagerEvent::RepoMetadataDirectoryLoaded { .. } => {}
                 }
             });

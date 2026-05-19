@@ -5214,6 +5214,12 @@ impl Workspace {
                     ctx,
                 );
             }
+            #[cfg(feature = "local_tty")]
+            LeftPanelEvent::OpenRemoteFile { remote_path } => {
+                self.open_remote_file(remote_path.clone(), ctx);
+            }
+            #[cfg(not(feature = "local_tty"))]
+            LeftPanelEvent::OpenRemoteFile { .. } => {}
             LeftPanelEvent::OpenSkillFile { source } => {
                 #[cfg(feature = "local_fs")]
                 {
@@ -5277,6 +5283,39 @@ impl Workspace {
                 ctx,
             );
         });
+    }
+
+    /// 在远端文件树里点击一个文件后,以 buffer-sync 协议打开它。
+    ///
+    /// 远端文件与本地文件统一走 [`Self::open_code`] / `CodePane` / `CodeView`:
+    /// 这样它就和本地文件一样遵守 `open_file_layout`(新 tab / 分屏)以及多文件
+    /// 分组开关(多个远端文件并入同一个代码编辑器 pane 的内部 tab)。
+    ///
+    /// buffer 内容仍由 `GlobalBufferModel` 的 `BufferLocation::Remote` 路径打开
+    /// (向 daemon 发 `OpenBuffer`,后续 `BufferEdit` / `BufferUpdatedPush` 同步),
+    /// 这一段由 `LocalCodeEditorView::new_with_remote_buffer` 在 `CodeView` 内部
+    /// 完成。
+    #[cfg(feature = "local_tty")]
+    pub fn open_remote_file(
+        &mut self,
+        remote_path: crate::code::buffer_location::RemotePath,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        log::info!(
+            "Opening remote file: host={} path={}",
+            remote_path.host_id,
+            remote_path.path.as_str()
+        );
+
+        let layout = *EditorSettings::as_ref(ctx).open_file_layout.value();
+        self.open_code(
+            CodeSource::RemoteFileTree { remote_path },
+            layout,
+            None,  /* line_col */
+            false, /* preview */
+            &[],   /* additional_paths */
+            ctx,
+        );
     }
 
     /// 在当前 tab 开新 terminal pane,自动跑 `ssh ...` 命令,并 spawn 一个
@@ -6676,15 +6715,21 @@ impl Workspace {
                         .is_pane_hidden_for_close(*pane_id)
                 });
             // If the tabbed editor view is enabled and there is an existing CodeView, we should group the newly opened file into this view.
-            if let (Some(path), Some((pane_id, code_view))) = (source.path(), code_view) {
+            if let (Some(location), Some((pane_id, code_view))) = (source.location(), code_view) {
                 code_view.update(ctx, |code_view, ctx| {
                     if preview {
-                        code_view.open_in_preview_or_promote_and_jump(path, line_col, ctx);
+                        code_view.open_in_preview_or_promote_and_jump(location, line_col, ctx);
                     } else {
-                        code_view.open_or_focus_existing(Some(path), line_col, ctx);
+                        code_view.open_or_focus_existing(Some(location), line_col, ctx);
                     }
                     for extra in additional_paths {
-                        code_view.open_or_focus_existing(Some(extra.clone()), None, ctx);
+                        code_view.open_or_focus_existing(
+                            Some(crate::code::buffer_location::BufferLocation::Local(
+                                extra.clone(),
+                            )),
+                            None,
+                            ctx,
+                        );
                     }
                 });
                 // Only focus the pane for non-preview opens
@@ -6698,10 +6743,10 @@ impl Workspace {
         } else {
             // When grouping is off, avoid opening duplicate code panes for the same file in the
             // current pane group. Instead, focus the existing pane and jump.
-            if let Some(path) = source.path() {
+            if let Some(location) = source.location() {
                 let pane_group_id = self.active_tab_pane_group().id();
                 let existing_locator = CodeManager::handle(ctx).read(ctx, |manager, _| {
-                    manager.get_locator_for_path_in_tab(pane_group_id, path.as_path())
+                    manager.get_locator_for_location_in_tab(pane_group_id, &location)
                 });
 
                 if let Some(locator) = existing_locator {
@@ -6714,13 +6759,13 @@ impl Workspace {
                             code_view.update(ctx, |code_view, ctx| {
                                 if preview {
                                     code_view.open_in_preview_or_promote_and_jump(
-                                        path.clone(),
+                                        location.clone(),
                                         line_col,
                                         ctx,
                                     );
                                 } else {
                                     code_view.open_or_focus_existing(
-                                        Some(path.clone()),
+                                        Some(location.clone()),
                                         line_col,
                                         ctx,
                                     );
@@ -6728,7 +6773,9 @@ impl Workspace {
 
                                 for extra in additional_paths {
                                     code_view.open_or_focus_existing(
-                                        Some(extra.clone()),
+                                        Some(crate::code::buffer_location::BufferLocation::Local(
+                                            extra.clone(),
+                                        )),
                                         None,
                                         ctx,
                                     );
@@ -6786,7 +6833,13 @@ impl Workspace {
             if let Some(code_view) = code_view_handle {
                 code_view.update(ctx, |code_view, ctx| {
                     for path in additional_paths {
-                        code_view.open_or_focus_existing(Some(path.clone()), None, ctx);
+                        code_view.open_or_focus_existing(
+                            Some(crate::code::buffer_location::BufferLocation::Local(
+                                path.clone(),
+                            )),
+                            None,
+                            ctx,
+                        );
                     }
                 });
             }
@@ -12429,23 +12482,25 @@ impl Workspace {
                                             return;
                                         }
 
-                                        let moved_file_path =
+                                        let moved_file_location =
                                             pane_group.update(ctx, |pane_group, ctx| {
                                                 pane_group.code_pane_by_id(*pane_id).and_then(
                                                     |pane| {
                                                         pane.file_view(ctx).update(
                                                             ctx,
                                                             |file_view, ctx| {
-                                                                let moved_file_path = file_view
+                                                                let moved_file_location = file_view
                                                                     .tab_at(*editor_tab_index)
-                                                                    .and_then(|t| t.path());
+                                                                    .and_then(|t| {
+                                                                        t.location().cloned()
+                                                                    });
 
                                                                 file_view.remove_tab_for_move(
                                                                     *editor_tab_index,
                                                                     ctx,
                                                                 );
 
-                                                                moved_file_path
+                                                                moved_file_location
                                                             },
                                                         )
                                                     },
@@ -12453,9 +12508,13 @@ impl Workspace {
                                             });
 
                                         // After removing the file from the origin's editor, we want to open it in the target's editor.
-                                        if let Some(path) = moved_file_path {
+                                        if let Some(location) = moved_file_location {
                                             target_code_view.update(ctx, |view, ctx| {
-                                                view.open_or_focus_existing(Some(path), None, ctx);
+                                                view.open_or_focus_existing(
+                                                    Some(location),
+                                                    None,
+                                                    ctx,
+                                                );
                                             });
                                         }
                                         return;
