@@ -7,6 +7,7 @@ use crate::ai::agent::{AIAgentAction, AIAgentActionId, AIAgentActionType};
 use crate::ai::blocklist::action_model::AIConversationId;
 use crate::ai::skills::SkillManager;
 use crate::warp_managed_paths_watcher::WarpManagedPathsWatcher;
+use ai::agent::action_result::AnyFileContent;
 use ai::skills::{parse_skill, SkillReference};
 use repo_metadata::{
     repositories::DetectedRepositories, watcher::DirectoryWatcher, RepoMetadataModel,
@@ -187,8 +188,8 @@ fn test_read_skill_executor_fallback_reads_disk_on_cache_miss() {
             AIAgentActionResultType::ReadSkill(ReadSkillResult::Success { content }) => {
                 assert_eq!(content.file_name, skill_path.to_string_lossy().to_string());
                 let body = match &content.content {
-                    ai::agent::action_result::AnyFileContent::StringContent(s) => s.clone(),
-                    ai::agent::action_result::AnyFileContent::BinaryContent(_) => {
+                    AnyFileContent::StringContent(s) => s.clone(),
+                    AnyFileContent::BinaryContent(_) => {
                         panic!("SKILL.md should be parsed as text")
                     }
                 };

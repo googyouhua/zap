@@ -1,9 +1,14 @@
 use super::{ActionExecution, AnyActionExecution, ExecuteActionInput, PreprocessActionInput};
+#[cfg(feature = "local_fs")]
 use crate::ai::agent::AIAgentActionResultType;
-use crate::ai::skills::{extract_skill_parent_directory, SkillManager, SkillTelemetryEvent};
+use crate::ai::skills::{SkillManager, SkillTelemetryEvent};
+#[cfg(feature = "local_fs")]
+use crate::ai::skills::extract_skill_parent_directory;
 use crate::send_telemetry_from_ctx;
 use ai::agent::action_result::AnyFileContent;
-use ai::skills::{parse_skill, SkillReference};
+use ai::skills::SkillReference;
+#[cfg(feature = "local_fs")]
+use ai::skills::parse_skill;
 use warpui::{ModelContext, SingletonEntity};
 
 use crate::ai::agent::AIAgentActionType;
@@ -76,6 +81,10 @@ impl ReadSkillExecutor {
                 // - Windows 下正则用反斜杠分隔,Linux 风格 `/home/<u>/...` 路径会被
                 //   拒绝;这意味着本兜底对 "Windows 主进程 + WSL session" 不生效,
                 //   是 issue #99 的已知限制(见 PR 描述)。
+                // Cache miss fallback 仅在拥有本地文件系统的构建中可用;
+                // WASM 等无 fs 构建里 `extract_skill_parent_directory` / `parse_skill`
+                // 不存在,自然也无从读盘。
+                #[cfg(feature = "local_fs")]
                 if let SkillReference::Path(path) = skill_ref {
                     if extract_skill_parent_directory(path).is_ok() {
                         let path = path.clone();
