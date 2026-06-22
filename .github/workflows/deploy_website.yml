@@ -42,24 +42,26 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "${{ secrets.DEPLOY_PORT || '22' }}" -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Rsync dist to server incoming/
+      - name: Rsync dist to server (.incoming)
         env:
           PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           USER: ${{ secrets.DEPLOY_USER }}
           HOST: ${{ secrets.DEPLOY_HOST }}
+          # DEPLOY_PATH = 站点 index 目录,例如 /opt/1panel/www/sites/zap.zerx.dev/index
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          # 确保远端目录存在
+          # 在站点父目录(index 的上一级)准备暂存区与脚本目录
+          PARENT="$(dirname "$DEPLOY_PATH")"
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
-            "mkdir -p '$DEPLOY_PATH/incoming' '$DEPLOY_PATH/deploy'"
-          # 推送静态产物(--delete 保证 incoming 与本地 dist 完全一致)
+            "mkdir -p '$PARENT/.incoming'"
+          # 推送静态产物到 .incoming(--delete 保证与本地 dist 完全一致)
           rsync -az --delete \
             -e "ssh -i ~/.ssh/deploy_key -p $PORT" \
-            dist/ "$USER@$HOST:$DEPLOY_PATH/incoming/"
-          # 推送部署脚本
+            dist/ "$USER@$HOST:$PARENT/.incoming/"
+          # 推送部署脚本到父目录
           rsync -az \
             -e "ssh -i ~/.ssh/deploy_key -p $PORT" \
-            deploy/deploy.sh "$USER@$HOST:$DEPLOY_PATH/deploy/deploy.sh"
+            deploy/deploy.sh "$USER@$HOST:$PARENT/deploy.sh"
 
       - name: Run remote deploy script
         env:
@@ -68,9 +70,11 @@ jobs:
           HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          # 远端赋予执行权限并运行,避免 pull/上传后无执行权限的问题
+          # 远端赋予执行权限并运行,把正式 index 目录作为参数传入
+          # 避免 pull/上传后无执行权限的问题:每次都 chmod +x
+          PARENT="$(dirname "$DEPLOY_PATH")"
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
-            "chmod +x '$DEPLOY_PATH/deploy/deploy.sh' && '$DEPLOY_PATH/deploy/deploy.sh'"
+            "chmod +x '$PARENT/deploy.sh' && '$PARENT/deploy.sh' '$DEPLOY_PATH'"
 
       - name: Cleanup SSH key
         if: always()
