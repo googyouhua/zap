@@ -274,11 +274,6 @@ pub fn init(app: &mut AppContext) {
                 id!("Terminal") & !id!("IMEOpen"),
             ),
             FixedBinding::new(
-                "shift-insert",
-                TerminalAction::Paste,
-                id!("Terminal") & !id!("IMEOpen"),
-            ),
-            FixedBinding::new(
                 cmd_or_ctrl_shift("c"),
                 TerminalAction::Copy,
                 id!("Terminal") & !id!("IMEOpen"),
@@ -326,6 +321,11 @@ pub fn init(app: &mut AppContext) {
             "shift-down",
             TerminalAction::KeyboardSelectText(SelectionDirection::Down),
             id!("Terminal") & !id!("IMEOpen") & id!("ActiveBlockTextSelection"),
+        ),
+        FixedBinding::new(
+            "shift-insert",
+            TerminalAction::Paste,
+            id!("Terminal") & !id!("IMEOpen"),
         ),
     ]);
 
