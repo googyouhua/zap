@@ -264,7 +264,7 @@ use crate::terminal::local_tty::get_shell_starter;
 use crate::terminal::local_tty::shell::ShellStarter;
 #[cfg(all(windows, feature = "local_tty"))]
 use crate::terminal::local_tty::windows::get_user_and_system_env_variable;
-use crate::terminal::model::blockgrid::BlockGrid;
+use crate::terminal::model::blockgrid::{BlockGrid, CursorDisplayPoint};
 use crate::terminal::model::session::active_session::ActiveSession;
 use crate::terminal::model::session::{Session, SessionId};
 use crate::terminal::model::{ObfuscateSecrets, RespectObfuscatedSecrets, SecretHandle};
@@ -23474,6 +23474,7 @@ impl TypedActionView for TerminalView {
             | RevealChildAgent { .. }
             | OpenCLIAgentRichInput
             | ToggleSessionRecording => Empty,
+            SplitBlock => Empty,
         }
     }
 
@@ -24428,6 +24429,26 @@ impl TypedActionView for TerminalView {
                 } else {
                     self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::CtrlG, ctx);
                 }
+            }
+            SplitBlock => {
+                let mut model = self.model.lock();
+                let idx = model.block_list().active_block_index();
+                let cursor_row = model
+                    .block_list()
+                    .block_at(idx)
+                    .and_then(|b| b.output_grid().cursor_display_point())
+                    .map(|p| match p {
+                        CursorDisplayPoint::Visible(pt) => pt.row,
+                        CursorDisplayPoint::HiddenCache(pt) => pt.row,
+                    });
+                if let Some(row) = cursor_row {
+                    if let Err(e) = model.block_list_mut()
+                        .split_active_block_at_cursor(idx, row)
+                    {
+                        log::warn!("SplitBlock failed: {e}");
+                    }
+                }
+                ctx.notify();
             }
         }
     }

@@ -209,7 +209,6 @@ impl HeaderGrid {
             .set_supports_emoji_presentation_selector(supports_emoji_presentation_selector);
     }
 
-    #[cfg(test)]
     pub(super) fn set_prompt_grid(&mut self, grid: BlockGrid) {
         self.prompt_grid = grid;
     }

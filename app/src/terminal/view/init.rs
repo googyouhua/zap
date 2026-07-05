@@ -302,6 +302,12 @@ pub fn init(app: &mut AppContext) {
     .with_context_predicate(id!("Terminal") & !id!("IMEOpen"))]);
 
     app.register_fixed_bindings([
+        // Manual block split when shell integration fails
+        FixedBinding::new(
+            "ctrl-alt-b",
+            TerminalAction::SplitBlock,
+            id!("Terminal") & !id!("IMEOpen"),
+        ),
         FixedBinding::new(
             "shift-left",
             TerminalAction::KeyboardSelectText(SelectionDirection::Left),

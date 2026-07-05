@@ -1,0 +1,4 @@
+{
+  "summary": "## Overview\n\n为终端添加 Shift+Insert 粘贴快捷键。在 `app/src/terminal/view/init.rs` 中注册了一条 `FixedBinding::new(\"shift-insert\", TerminalAction::Paste, id!(\"Terminal\") & !id!(\"IMEOpen\"))`，紧跟在现有的 `cmd_or_ctrl_shift(\"v\")` Paste 绑定之后。实现、设计文档和任务清单完全对齐。\n\n- `insert` 已注册在 `VALID_SPECIAL_KEYS` 中（keymap.rs:805），`\"shift-insert\"` 的解析路径经过验证：`shift` 被 `Keystroke::parse` 识别为修饰键，`insert` 是有效特殊键。\n- context predicate 与所有现有粘贴绑定一致：`id!(\"Terminal\") & !id!(\"IMEOpen\")`。\n- 与已有绑定无冲突：无 Shift 的 `insert` 绑定在 `TerminalAction::ControlSequence(\"\\x1b[2~\")`，Shift+Insert 是不同的键码（不同 `Keystroke` 结构体实例）。\n- 没有修改粘贴逻辑、context predicate、feature flag、配置项——仅一行注册。\n\n## Concerns\n\n无。改动范围极小、正确且对齐了 spec。\n\n## Verdict\n\nFound: 0 critical, 0 important, 0 suggestions\n\n**Approve**",
+  "comments": []
+}

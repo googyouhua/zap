@@ -13008,15 +13008,10 @@ impl Input {
 
         if let Some(block) = block {
             if !is_udi && block.honor_ps1() && model.block_list().is_bootstrapped() {
-                // PS1 mode: capture the raw prompt grid so the command palette
-                // can render it with full fidelity (CORE-1683).
                 prompt_elements.ps1_prompt_grid = Some(block.prompt_grid().clone());
             }
         }
 
-        // Always capture a chip snapshot as the fallback prompt representation.
-        // This covers both UDI mode and any edge cases where PS1 is not available
-        // (e.g. not yet bootstrapped, block-level honor_ps1 mismatch).
         if prompt_elements.ps1_prompt_grid.is_none() {
             prompt_elements.prompt_chip_snapshot = Some(self.prompt_type.as_ref(app).snapshot(app));
         }

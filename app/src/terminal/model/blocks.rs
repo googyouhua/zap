@@ -41,6 +41,7 @@ use warpui::r#async::executor::Background;
 use warpui::record_trace_event;
 
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroUsize;
 use warpui::{
     units::{IntoLines, IntoPixels, Lines},
     AppContext, EntityId, ViewHandle,
@@ -48,7 +49,9 @@ use warpui::{
 
 use super::block::{BlockId, BlockSize, BlockState};
 use super::early_output::EarlyOutput;
-use super::grid::grid_handler::{FragmentBoundary, GridHandler, PossiblePath};
+use super::grid::grid_handler::{
+    FragmentBoundary, GridHandler, PerformResetGridChecks, PossiblePath,
+};
 use super::grid::RespectDisplayedOutput;
 use super::image_map::StoredImageMetadata;
 use super::kitty::{KittyAction, KittyResponse};
@@ -838,6 +841,81 @@ impl BlockList {
 
     pub fn active_block(&self) -> &Block {
         self.blocks.last().expect("at least one block should exist")
+    }
+
+    pub fn split_active_block_at_cursor(&mut self, block_idx: BlockIndex, cursor_line: usize) -> Result<(), &'static str> {
+        let output_clone = {
+            let active = self.block_at(block_idx).ok_or("active block not found")?;
+            if cursor_line >= active.output_grid().len() {
+                return Err("cursor_line out of bounds");
+            }
+            active.output_grid().clone()
+        };
+
+        // Split at cursor_line + 1, then separate the cursor row
+        let sp = NonZeroUsize::new(cursor_line + 1).ok_or("split point overflowed")?;
+        let (top_block, new_output) = output_clone.split(sp);
+
+        let (orig_grid, cmd_grid) = if cursor_line == 0 {
+            let cmd_grid = top_block;
+            let empty = BlockGrid::new(
+                self.size.clone(),
+                self.max_grid_size_limit,
+                self.event_proxy.clone(),
+                self.obfuscate_secrets,
+                PerformResetGridChecks::No,
+            );
+            (empty, cmd_grid)
+        } else {
+            let cs = NonZeroUsize::new(cursor_line).unwrap();
+            let (orig, co) = top_block.split(cs);
+            (orig, co.unwrap())
+        };
+
+        let cmd_text: String = cmd_grid
+            .contents_to_string_force_full_grid_contents(false, None)
+            .chars()
+            .filter(|&c| c != '\r' && c != '\n' && c != '\x1b')
+            .collect();
+
+        self.blocks_mut()[block_idx.0].set_output_grid(orig_grid);
+
+        let new_id = BlockId::new();
+        self.create_new_block(new_id, self.bootstrap_stage, None, None);
+
+        let orig_session_id = self.block_at(block_idx).and_then(|b| b.session_id());
+        let orig_shell_host = self.block_at(block_idx).and_then(|b| b.shell_host());
+
+        {
+            let new_block = self.blocks_mut().last_mut().ok_or("new block not created")?;
+            if let Some(sid) = orig_session_id {
+                new_block.set_session_id(sid);
+            }
+            if let Some(host) = orig_shell_host {
+                new_block.set_shell_host(host);
+            }
+            new_block.set_honor_ps1(true);
+            new_block.init_command(&cmd_text);
+            if let Some(output) = new_output {
+                new_block.set_output_grid(output);
+            }
+        }
+
+        // Transition to Executing so terminal output routes to output_grid
+        self.preexec(PreexecValue::default());
+
+        // Render immediately (skip the 50ms delay)
+        if let Some(last) = self.blocks_mut().last_mut() {
+            last.mark_render_ready();
+        }
+
+        let insertion_index = TotalIndex(self.block_heights.summary().total_count - 1);
+        self.update_block_height_indices(
+            BlockHeightUpdate::Insertion(insertion_index),
+            false,
+        );
+
+        Ok(())
     }
 
     pub fn active_block_id(&self) -> &BlockId {

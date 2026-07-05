@@ -398,6 +398,9 @@ pub enum TerminalAction {
     /// Open the rich input editor for composing a prompt to send to a CLI agent.
     /// Triggered by Ctrl-G when a CLI agent is detected, or from the footer button.
     OpenCLIAgentRichInput,
+    /// Split the active block at the cursor position (manual override when
+    /// shell integration fails to detect the boundary).
+    SplitBlock,
 }
 
 // Manually implementing Debug to avoid leaking sensitive information in logs
@@ -646,6 +649,7 @@ impl fmt::Debug for TerminalAction {
             RevealChildAgent { .. } => write!(f, "RevealChildAgent"),
             ToggleSessionRecording => write!(f, "ToggleSessionRecording"),
             OpenCLIAgentRichInput => write!(f, "OpenCLIAgentRichInput"),
+            SplitBlock => f.write_str("SplitBlock"),
         }
     }
 }

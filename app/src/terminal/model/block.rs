@@ -1132,20 +1132,17 @@ impl Block {
     }
 
     /// Replaces the block's prompt grid with the given one.
-    #[cfg(test)]
-    pub(super) fn set_prompt_grid(&mut self, prompt_grid: BlockGrid) {
+    pub(crate) fn set_prompt_grid(&mut self, prompt_grid: BlockGrid) {
         self.header_grid.set_prompt_grid(prompt_grid);
     }
 
     /// Replaces the block's rprompt grid with the given one.
-    #[cfg(test)]
-    pub(super) fn set_rprompt_grid(&mut self, rprompt_grid: BlockGrid) {
+    pub(crate) fn set_rprompt_grid(&mut self, rprompt_grid: BlockGrid) {
         self.rprompt_grid = rprompt_grid;
     }
 
     /// Replaces the block's output grid with the given one.
     /// Useful for test functions.
-    #[cfg(test)]
     pub fn set_output_grid(&mut self, output_grid: BlockGrid) {
         self.output_grid = output_grid;
     }
@@ -1191,6 +1188,12 @@ impl Block {
         self.wakeup_after_delay();
     }
 
+    /// Immediately mark this block as ready to render, bypassing the
+    /// render delay. Used for manually created blocks (e.g. split).
+    pub fn mark_render_ready(&mut self) {
+        self.render_delay_complete.store(true, Ordering::Relaxed);
+    }
+
     /// Returns the `env_var_metadata` associated with this block, if any.
     pub fn env_var_metadata(&self) -> Option<&BlocklistEnvVarMetadata> {
         self.env_var_metadata.as_ref()
@@ -1221,6 +1224,18 @@ impl Block {
     /// Scans the entire block (not just the dirty bytes) for secrets.
     pub fn scan_full_block_for_secrets(&mut self) {
         self.for_each_block_grid(|block_grid| block_grid.scan_full_grid_for_secrets())
+    }
+
+    /// Activate the block for command processing without a preexec hook.
+    /// Sets state to Executing and starts the output grid so that
+    /// terminal output is routed to output_grid instead of header_grid.
+    pub fn start_output_routing(&mut self) {
+        if !self.started() && self.state == BlockState::BeforeExecution {
+            self.start();
+        }
+        self.output_grid.start();
+        self.state = BlockState::Executing;
+        self.render_delay_complete.store(true, Ordering::Relaxed);
     }
 
     /// Starts this block as a background output block, with no command.
@@ -1917,8 +1932,14 @@ impl Block {
         if !self.ready_to_render() {
             Lines::zero()
         } else if self.header_grid.honor_ps1 {
-            // No padding between prompt and command in the case of PS1 (combined grid).
-            self.header_grid.prompt_and_command_height()
+            // When combined grid is empty (shell integration missing), include
+            // prompt height so the prompt row is properly accounted for.
+            let height = self.header_grid.prompt_and_command_height();
+            if height == Lines::zero() {
+                self.prompt_height()
+            } else {
+                height
+            }
         } else {
             // Handle the case of Zap built-in prompt with combined grid.
             // Note that we have non-zero `command_padding_top` in this case, unlike above!
@@ -2576,7 +2597,6 @@ impl Block {
         self.shell_host = Some(shell_host);
     }
 
-    #[cfg(test)]
     pub fn set_session_id(&mut self, id: SessionId) {
         self.session_id = Some(id);
     }
@@ -2703,6 +2723,10 @@ impl Block {
 
     pub fn has_received_precmd(&self) -> bool {
         self.precmd_state == PrecmdState::AfterPrecmd
+    }
+
+    pub fn mark_precmd_received(&mut self) {
+        self.precmd_state = PrecmdState::AfterPrecmd;
     }
 
     pub fn is_in_band_command_block(&self) -> bool {

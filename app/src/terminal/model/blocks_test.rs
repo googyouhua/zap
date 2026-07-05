@@ -20,6 +20,7 @@ use crate::{
         SizeUpdateReason,
     },
 };
+use crate::test_util::mock_blockgrid;
 
 pub fn input_string(block_list: &mut BlockList, input: &str) {
     for c in input.chars() {
@@ -2050,4 +2051,89 @@ fn test_device_status_uses_active_block_if_no_typeahead() {
     block_list.device_status(&mut writer, 6);
 
     assert_eq!(writer, "\x1b[1;21R".as_bytes());
+}
+
+#[test]
+fn test_split_active_block_at_cursor() {
+    let mut block_list = new_bootstrapped_block_list(None, None, ChannelEventListener::new_for_test());
+
+    insert_block(&mut block_list, "echo hi", "a\nb\nc");
+
+    let mut output_grid = mock_blockgrid("line1\r\nline2\r\nline3");
+    output_grid.finish();
+    {
+        let active_block = block_list.blocks_mut().last_mut().unwrap();
+        active_block.set_output_grid(output_grid);
+    }
+
+    assert_eq!(block_list.blocks().len(), 4);
+    let result = block_list.split_active_block_at_cursor(BlockIndex(3), 1);
+    assert!(result.is_ok(), "split failed: {result:?}");
+
+    assert_eq!(block_list.blocks().len(), 5);
+
+    let original = block_list.block_at(BlockIndex(3)).unwrap();
+    assert_eq!(
+        original.output_grid().contents_to_string(false, None),
+        "line1"
+    );
+
+    let new_block = block_list.block_at(BlockIndex(4)).unwrap();
+    assert_eq!(new_block.command_to_string().trim(), "line2");
+    assert_eq!(
+        new_block.output_grid().contents_to_string(false, None),
+        "line3"
+    );
+}
+
+#[test]
+fn test_split_active_block_at_cursor_first_line() {
+    let mut block_list = new_bootstrapped_block_list(None, None, ChannelEventListener::new_for_test());
+
+    insert_block(&mut block_list, "echo hi", "a\nb\nc");
+
+    let mut output_grid = mock_blockgrid("line1\r\nline2\r\nline3");
+    output_grid.finish();
+    {
+        let active_block = block_list.blocks_mut().last_mut().unwrap();
+        active_block.set_output_grid(output_grid);
+    }
+
+    let result = block_list.split_active_block_at_cursor(BlockIndex(3), 0);
+    assert!(result.is_ok(), "split at line 0 failed: {result:?}");
+
+    let original = block_list.block_at(BlockIndex(3)).unwrap();
+    assert!(original.output_grid().contents_to_string(false, None).trim().is_empty());
+
+    let new_block = block_list.block_at(BlockIndex(4)).unwrap();
+    assert_eq!(new_block.command_to_string().trim(), "line1");
+    let output = new_block.output_grid().contents_to_string(false, None);
+    assert!(
+        !output.trim().is_empty(),
+        "expected output for new block, got empty"
+    );
+}
+
+#[test]
+fn test_split_active_block_at_cursor_last_line() {
+    let mut block_list = new_bootstrapped_block_list(None, None, ChannelEventListener::new_for_test());
+
+    insert_block(&mut block_list, "echo hi", "a\nb\nc");
+
+    let mut output_grid = mock_blockgrid("only_line\r\n");
+    output_grid.finish();
+    {
+        let active_block = block_list.blocks_mut().last_mut().unwrap();
+        active_block.set_output_grid(output_grid);
+    }
+
+    let result = block_list.split_active_block_at_cursor(BlockIndex(3), 0);
+    assert!(result.is_ok(), "split at last line failed: {result:?}");
+
+    let new_block = block_list.block_at(BlockIndex(4)).unwrap();
+    assert_eq!(new_block.command_to_string().trim(), "only_line");
+    assert!(
+        new_block.output_grid().contents_to_string(false, None).trim().is_empty(),
+        "new block should have no output"
+    );
 }
