@@ -367,6 +367,15 @@ pub fn init(app: &mut AppContext) {
                 & id!("LongRunningCommand")
                 & id!("SshWarpificationBanner"),
         ),
+        // Unconditional warpify: writes init script to PTY regardless of banner
+        // Useful for nested SSH sessions (multi-hop) where banner detection doesn't work
+        EditableBinding::new(
+            "terminal:manual_warpify",
+            crate::t!("keybinding-desc-terminal-warpify-subshell"),
+            TerminalAction::TriggerSubshellBootstrap,
+        )
+        .with_key_binding("ctrl-alt-i")
+        .with_context_predicate(id!("Terminal") & !id!("IMEOpen")),
         EditableBinding::new(
             ACCEPT_PROMPT_SUGGESTION_KEYBINDING,
             crate::t!("keybinding-desc-terminal-accept-prompt-suggestion"),
