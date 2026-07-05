@@ -800,7 +800,7 @@ impl SettingsWidget for SSHWidget {
                         .finish(),
                 );
 
-                if enable_ssh_warpification && should_prompt_ssh_tmux_wrapper {
+                if enable_ssh_warpification {
                     let warpify_settings = WarpifySettings::as_ref(app);
                     column.add_child(
                         view.build_input_list(
