@@ -342,7 +342,6 @@ use std::hash::Hash;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -513,10 +512,8 @@ use super::model::session::SessionBootstrappedEvent;
 use super::settings::AltScreenPaddingMode;
 use super::ssh::error::{SshErrorBlock, SshErrorBlockEvent, SSH_ERROR_BLOCK_VISIBLE_KEY};
 use super::ssh::install_tmux::{
-    install_root_tmux_script, install_tmux_script, SshInstallTmuxBlock, SshInstallTmuxBlockEvent,
-    SshKeyEvent, TmuxInstallMethod,
+    SshInstallTmuxBlock, SshInstallTmuxBlockEvent, SshKeyEvent, TmuxInstallMethod,
 };
-use super::ssh::root_access::RootAccess;
 use super::ssh::ssh_detection::evaluate_warpify_ssh_host;
 use super::ssh::util::{
     convert_script_to_one_line, parse_interactive_ssh_command, InteractiveSshCommand,
@@ -7756,54 +7753,15 @@ impl TerminalView {
         // Stop the pending timeout on warpification.
         self.warpify_state.abort_ssh_warpify_timeout();
         match &reason {
-            WarpificationUnavailableReason::TmuxNotInstalled {
-                system_details,
-                root_access,
-            } => {
-                if system_details.writable_home != Some(true) {
-                    if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
-                        self.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
-                        return;
-                    }
-                }
-
-                if let Some(tmux_install_script) = install_tmux_script(system_details, ctx) {
-                    let root_access = RootAccess::from_str(root_access).unwrap_or_default();
-                    let tmux_root_install_script = if root_access == RootAccess::NoRootAccess {
-                        None
-                    } else {
-                        install_root_tmux_script(
-                            system_details,
-                            ctx,
-                            root_access == RootAccess::CanRunSudo,
-                        )
-                    };
-                    self.add_ssh_install_tmux_block(
-                        system_details,
-                        tmux_install_script,
-                        tmux_root_install_script,
-                        false,
-                        ctx,
-                    );
+            WarpificationUnavailableReason::TmuxNotInstalled { system_details, .. } => {
+                if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
+                    self.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
                     return;
                 }
             }
             WarpificationUnavailableReason::UnsupportedTmuxVersion { system_details } => {
-                if system_details.writable_home != Some(true) {
-                    if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
-                        self.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
-                        return;
-                    }
-                }
-
-                if let Some(tmux_install_script) = install_tmux_script(system_details, ctx) {
-                    self.add_ssh_install_tmux_block(
-                        system_details,
-                        tmux_install_script,
-                        None,
-                        true,
-                        ctx,
-                    );
+                if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
+                    self.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
                     return;
                 }
             }
@@ -10525,20 +10483,10 @@ impl TerminalView {
                 self.warpify_state
                     .set_tmux_installation_state(*tmux_installation);
             }
-            ModelEvent::TmuxInstallFailed { line, command } => {
-                let system_details = self
-                    .warpify_state
-                    .ssh_block_state()
-                    .and_then(|s| s.get_system_details(ctx));
+            ModelEvent::TmuxInstallFailed { .. } => {
                 self.warpify_state.abort_ssh_warpify_timeout();
-                self.add_ssh_error_block(
-                    WarpificationUnavailableReason::TmuxInstallFailed {
-                        system_details,
-                        line: Some(line.to_string()),
-                        command: Some(command.to_string()),
-                    },
-                    ctx,
-                );
+                let shell_type = self.warpify_state.get_shell_type();
+                self.trigger_subshell_bootstrap(shell_type, false, ctx);
             }
             ModelEvent::ExecutedInBandCommand(event) => {
                 // TODO(vorporeal): Figure out a way to not need the terminal view involved
