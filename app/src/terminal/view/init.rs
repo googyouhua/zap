@@ -322,6 +322,11 @@ pub fn init(app: &mut AppContext) {
             TerminalAction::KeyboardSelectText(SelectionDirection::Down),
             id!("Terminal") & !id!("IMEOpen") & id!("ActiveBlockTextSelection"),
         ),
+        FixedBinding::new(
+            "shift-insert",
+            TerminalAction::Paste,
+            id!("Terminal") & !id!("IMEOpen"),
+        ),
     ]);
 
     app.register_editable_bindings([
