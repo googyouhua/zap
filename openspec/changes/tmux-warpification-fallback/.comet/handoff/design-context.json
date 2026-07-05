@@ -1,0 +1,14 @@
+{
+  "change": "tmux-warpification-fallback",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "6bc70745a80356c56eaadd9b397ec76f941bdd0b747acd14aec96d3729e8f1b1",
+  "files": [
+    { "path": "openspec/changes/tmux-warpification-fallback/proposal.md", "sha256": "44a36ea2edb43c8a014d851a822a9beca823d07fcbfdde7896db7d5a82d059da" },
+    { "path": "openspec/changes/tmux-warpification-fallback/design.md", "sha256": "4832abbbedccca68772a392d11b1ff2af34aacd6579b6a08cb32ffd44df66192" },
+    { "path": "openspec/changes/tmux-warpification-fallback/tasks.md", "sha256": "7aea3b4864907c8ae1e57c9f432f3600748d8ca2308c64137afd9dd6949ea5ac" },
+    { "path": "openspec/changes/tmux-warpification-fallback/specs/ssh-tmux-fallback/spec.md", "sha256": "ec32edfccc397838c909b49837bd701dfd078467dc8607b37e727d7e70589373" }
+  ]
+}
