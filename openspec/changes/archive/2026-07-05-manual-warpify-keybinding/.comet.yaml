@@ -1,5 +1,5 @@
 workflow: hotfix
-phase: build
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -12,10 +12,10 @@ auto_transition: true
 base_ref: 5c145ccd27925c6710d6f6194a0f6817866dbc52
 design_doc: null
 plan: null
-verify_result: pending
-verification_report: null
-branch_status: pending
+verify_result: pass
+verification_report: docs/superpowers/reports/2026-07-04-manual-warpify-keybinding-verify.md
+branch_status: handled
 created_at: 2026-07-05
-verified_at: null
-archived: false
+verified_at: 2026-07-05
+archived: true
 direct_override: true
