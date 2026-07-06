@@ -1,0 +1,191 @@
+name: CI Build (script/run style)
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 编译通道
+        type: choice
+        options:
+          - oss
+          - dev
+          - preview
+          - stable
+        default: oss
+      os:
+        description: 目标平台
+        type: choice
+        options:
+          - linux
+          - macos
+          - windows
+          - all
+        default: all
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_linux:
+    name: Build Linux
+    if: ${{ inputs.os == 'all' || inputs.os == 'linux' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/prepare_environment
+        with:
+          target_os: linux
+          install_release_deps: true
+
+      - name: Free up disk space
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift || true
+          df -h /
+
+      - name: Compute build parameters
+        id: params
+        shell: bash
+        run: |
+          case "${{ inputs.channel }}" in
+            oss)
+              echo "features=gui" >> $GITHUB_OUTPUT
+              echo "profile=dev" >> $GITHUB_OUTPUT
+              echo "bin=zap-oss" >> $GITHUB_OUTPUT
+              ;;
+            dev|preview|stable)
+              echo "features=release_bundle,crash_reporting" >> $GITHUB_OUTPUT
+              echo "profile=release-lto" >> $GITHUB_OUTPUT
+              echo "bin=zap-oss" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Install extra dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libdbus-1-dev
+        shell: bash
+
+      - name: Build
+        run: |
+          cargo build -p warp \
+            --profile ${{ steps.params.outputs.profile }} \
+            --features "${{ steps.params.outputs.features }}" \
+            --bin ${{ steps.params.outputs.bin }}
+        shell: bash
+        env:
+          GIT_RELEASE_TAG: ${{ github.ref_name }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zap-linux-${{ inputs.channel }}
+          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}
+          if-no-files-found: error
+          retention-days: 7
+
+  build_macos:
+    name: Build macOS
+    if: ${{ inputs.os == 'all' || inputs.os == 'macos' }}
+    runs-on: macos-26
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: ./.github/actions/prepare_environment
+        with:
+          target_os: macos
+          install_release_deps: true
+
+      - name: Compute build parameters
+        id: params
+        shell: bash
+        run: |
+          case "${{ inputs.channel }}" in
+            oss)
+              echo "features=gui" >> $GITHUB_OUTPUT
+              echo "profile=dev" >> $GITHUB_OUTPUT
+              echo "bin=zap-oss" >> $GITHUB_OUTPUT
+              ;;
+            dev|preview|stable)
+              echo "features=release_bundle,crash_reporting" >> $GITHUB_OUTPUT
+              echo "profile=release-lto" >> $GITHUB_OUTPUT
+              echo "bin=zap-oss" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Ensure rust target is installed
+        run: rustup target add aarch64-apple-darwin
+        shell: bash
+
+      - name: Build
+        run: |
+          cargo build -p warp \
+            --profile ${{ steps.params.outputs.profile }} \
+            --features "${{ steps.params.outputs.features }}" \
+            --bin ${{ steps.params.outputs.bin }}
+        shell: bash
+        env:
+          GIT_RELEASE_TAG: ${{ github.ref_name }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zap-macos-${{ inputs.channel }}
+          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}
+          if-no-files-found: error
+          retention-days: 7
+
+  build_windows:
+    name: Build Windows
+    if: ${{ inputs.os == 'all' || inputs.os == 'windows' }}
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83fd # v6.0.2
+
+      - uses: ./.github/actions/prepare_environment
+        with:
+          target_os: windows
+          install_release_deps: true
+
+      - name: Compute build parameters
+        id: params
+        shell: bash
+        run: |
+          case "${{ inputs.channel }}" in
+            oss)
+              echo "features=gui" >> $GITHUB_OUTPUT
+              echo "profile=dev" >> $GITHUB_OUTPUT
+              echo "bin=zap-oss" >> $GITHUB_OUTPUT
+              ;;
+            dev|preview|stable)
+              echo "features=release_bundle,crash_reporting" >> $GITHUB_OUTPUT
+              echo "profile=release-lto" >> $GITHUB_OUTPUT
+              echo "bin=zap-oss" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Build
+        run: |
+          cargo build -p warp `
+            --profile ${{ steps.params.outputs.profile }} `
+            --features "${{ steps.params.outputs.features }}" `
+            --bin ${{ steps.params.outputs.bin }}
+        shell: pwsh
+        env:
+          GIT_RELEASE_TAG: ${{ github.ref_name }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: zap-windows-${{ inputs.channel }}
+          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}
+          if-no-files-found: error
+          retention-days: 7
