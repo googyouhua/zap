@@ -65,6 +65,7 @@ jobs:
               echo "bin=zap-oss" >> $GITHUB_OUTPUT
               ;;
           esac
+          echo "extension=" >> $GITHUB_OUTPUT
 
       - name: Install extra dependencies
         run: |
@@ -86,7 +87,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: zap-linux-${{ inputs.channel }}
-          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}
+          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}${{ steps.params.outputs.extension }}
           if-no-files-found: error
           retention-days: 7
 
@@ -119,6 +120,7 @@ jobs:
               echo "bin=zap-oss" >> $GITHUB_OUTPUT
               ;;
           esac
+          echo "extension=" >> $GITHUB_OUTPUT
 
       - name: Ensure rust target is installed
         run: rustup target add aarch64-apple-darwin
@@ -138,7 +140,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: zap-macos-${{ inputs.channel }}
-          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}
+          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}${{ steps.params.outputs.extension }}
           if-no-files-found: error
           retention-days: 7
 
@@ -171,6 +173,7 @@ jobs:
               echo "bin=zap-oss" >> $GITHUB_OUTPUT
               ;;
           esac
+          echo "extension=.exe" >> $GITHUB_OUTPUT
 
       - name: Build
         run: |
@@ -186,6 +189,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: zap-windows-${{ inputs.channel }}
-          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}
+          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}${{ steps.params.outputs.extension }}
           if-no-files-found: error
           retention-days: 7
