@@ -342,6 +342,7 @@ use std::hash::Hash;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::mpsc::SyncSender;
 use std::sync::Arc;
 use std::thread::JoinHandle;
@@ -512,8 +513,10 @@ use super::model::session::SessionBootstrappedEvent;
 use super::settings::AltScreenPaddingMode;
 use super::ssh::error::{SshErrorBlock, SshErrorBlockEvent, SSH_ERROR_BLOCK_VISIBLE_KEY};
 use super::ssh::install_tmux::{
-    SshInstallTmuxBlock, SshInstallTmuxBlockEvent, SshKeyEvent, TmuxInstallMethod,
+    install_root_tmux_script, install_tmux_script, SshInstallTmuxBlock, SshInstallTmuxBlockEvent,
+    SshKeyEvent, TmuxInstallMethod,
 };
+use super::ssh::root_access::RootAccess;
 use super::ssh::ssh_detection::evaluate_warpify_ssh_host;
 use super::ssh::util::{
     convert_script_to_one_line, parse_interactive_ssh_command, InteractiveSshCommand,
@@ -7753,9 +7756,35 @@ impl TerminalView {
         // Stop the pending timeout on warpification.
         self.warpify_state.abort_ssh_warpify_timeout();
         match &reason {
-            WarpificationUnavailableReason::TmuxNotInstalled { system_details, .. } => {
-                if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
-                    self.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
+            WarpificationUnavailableReason::TmuxNotInstalled {
+                system_details,
+                root_access,
+            } => {
+                if system_details.writable_home != Some(true) {
+                    if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
+                        self.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
+                        return;
+                    }
+                }
+
+                if let Some(tmux_install_script) = install_tmux_script(system_details, ctx) {
+                    let root_access = RootAccess::from_str(root_access).unwrap_or_default();
+                    let tmux_root_install_script = if root_access == RootAccess::NoRootAccess {
+                        None
+                    } else {
+                        install_root_tmux_script(
+                            system_details,
+                            ctx,
+                            root_access == RootAccess::CanRunSudo,
+                        )
+                    };
+                    self.add_ssh_install_tmux_block(
+                        system_details,
+                        tmux_install_script,
+                        tmux_root_install_script,
+                        false,
+                        ctx,
+                    );
                     return;
                 }
             }
@@ -8054,6 +8083,15 @@ impl TerminalView {
     ) {
         fn cancel_tmux_install(me: &mut TerminalView, ctx: &mut ViewContext<TerminalView>) {
             send_telemetry_from_ctx!(TelemetryEvent::SshInstallTmuxBlockDismissed, ctx);
+
+            if let Some(system_details) = me.warpify_state.ssh_block_state()
+                .and_then(|s| s.get_system_details(ctx))
+            {
+                if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
+                    me.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
+                }
+            }
+
             me.cancel_bootstrap_workflow(ctx);
         }
 
