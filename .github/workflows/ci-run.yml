@@ -55,8 +55,8 @@ jobs:
         run: |
           case "${{ inputs.channel }}" in
             oss)
-              echo "features=gui" >> $GITHUB_OUTPUT
-              echo "profile=dev" >> $GITHUB_OUTPUT
+              echo "features=release_bundle,standalone" >> $GITHUB_OUTPUT
+              echo "profile=release-lto" >> $GITHUB_OUTPUT
               echo "bin=zap-oss" >> $GITHUB_OUTPUT
               ;;
             dev|preview|stable)
@@ -110,8 +110,8 @@ jobs:
         run: |
           case "${{ inputs.channel }}" in
             oss)
-              echo "features=gui" >> $GITHUB_OUTPUT
-              echo "profile=dev" >> $GITHUB_OUTPUT
+              echo "features=release_bundle,standalone" >> $GITHUB_OUTPUT
+              echo "profile=release-lto" >> $GITHUB_OUTPUT
               echo "bin=zap-oss" >> $GITHUB_OUTPUT
               ;;
             dev|preview|stable)
@@ -163,8 +163,8 @@ jobs:
         run: |
           case "${{ inputs.channel }}" in
             oss)
-              echo "features=gui" >> $GITHUB_OUTPUT
-              echo "profile=dev" >> $GITHUB_OUTPUT
+              echo "features=release_bundle,standalone" >> $GITHUB_OUTPUT
+              echo "profile=release-lto" >> $GITHUB_OUTPUT
               echo "bin=zap-oss" >> $GITHUB_OUTPUT
               ;;
             dev|preview|stable)
