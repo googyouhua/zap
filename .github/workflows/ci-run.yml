@@ -3,24 +3,18 @@ name: CI Build (script/run style)
 on:
   workflow_dispatch:
     inputs:
-      channel:
-        description: 编译通道
-        type: choice
-        options:
-          - oss
-          - dev
-          - preview
-          - stable
-        default: oss
-      os:
-        description: 目标平台
-        type: choice
-        options:
-          - linux
-          - macos
-          - windows
-          - all
-        default: all
+      linux:
+        description: Linux x86_64
+        type: boolean
+        default: true
+      macos:
+        description: macOS arm64
+        type: boolean
+        default: false
+      windows:
+        description: Windows x64
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,11 +25,11 @@ env:
 jobs:
   build_linux:
     name: Build Linux
-    if: ${{ inputs.os == 'all' || inputs.os == 'linux' }}
+    if: ${{ inputs.linux == 'true' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4 # v6.0.2
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/prepare_environment
         with:
@@ -49,24 +43,6 @@ jobs:
             /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift || true
           df -h /
 
-      - name: Compute build parameters
-        id: params
-        shell: bash
-        run: |
-          case "${{ inputs.channel }}" in
-            oss)
-              echo "features=release_bundle,standalone" >> $GITHUB_OUTPUT
-              echo "profile=release-lto" >> $GITHUB_OUTPUT
-              echo "bin=zap-oss" >> $GITHUB_OUTPUT
-              ;;
-            dev|preview|stable)
-              echo "features=release_bundle,crash_reporting" >> $GITHUB_OUTPUT
-              echo "profile=release-lto" >> $GITHUB_OUTPUT
-              echo "bin=zap-oss" >> $GITHUB_OUTPUT
-              ;;
-          esac
-          echo "extension=" >> $GITHUB_OUTPUT
-
       - name: Install extra dependencies
         run: |
           sudo apt-get update
@@ -76,51 +52,33 @@ jobs:
       - name: Build
         run: |
           cargo build -p warp \
-            --profile ${{ steps.params.outputs.profile }} \
-            --features "${{ steps.params.outputs.features }}" \
-            --bin ${{ steps.params.outputs.bin }}
+            --profile release \
+            --features "gui" \
+            --bin zap-oss
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4 # v4.6.2
+        uses: actions/upload-artifact@v4
         with:
-          name: zap-linux-${{ inputs.channel }}
-          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}${{ steps.params.outputs.extension }}
+          name: zap-oss-linux
+          path: target/release/zap-oss
           if-no-files-found: error
           retention-days: 7
 
   build_macos:
     name: Build macOS
-    if: ${{ inputs.os == 'all' || inputs.os == 'macos' }}
+    if: ${{ inputs.macos == 'true' }}
     runs-on: macos-26
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4 # v6.0.2
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/prepare_environment
         with:
           target_os: macos
           install_release_deps: true
-
-      - name: Compute build parameters
-        id: params
-        shell: bash
-        run: |
-          case "${{ inputs.channel }}" in
-            oss)
-              echo "features=release_bundle,standalone" >> $GITHUB_OUTPUT
-              echo "profile=release-lto" >> $GITHUB_OUTPUT
-              echo "bin=zap-oss" >> $GITHUB_OUTPUT
-              ;;
-            dev|preview|stable)
-              echo "features=release_bundle,crash_reporting" >> $GITHUB_OUTPUT
-              echo "profile=release-lto" >> $GITHUB_OUTPUT
-              echo "bin=zap-oss" >> $GITHUB_OUTPUT
-              ;;
-          esac
-          echo "extension=" >> $GITHUB_OUTPUT
 
       - name: Ensure rust target is installed
         run: rustup target add aarch64-apple-darwin
@@ -129,66 +87,48 @@ jobs:
       - name: Build
         run: |
           cargo build -p warp \
-            --profile ${{ steps.params.outputs.profile }} \
-            --features "${{ steps.params.outputs.features }}" \
-            --bin ${{ steps.params.outputs.bin }}
+            --profile release \
+            --features "gui" \
+            --bin zap-oss
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4 # v4.6.2
+        uses: actions/upload-artifact@v4
         with:
-          name: zap-macos-${{ inputs.channel }}
-          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}${{ steps.params.outputs.extension }}
+          name: zap-oss-macos
+          path: target/release/zap-oss
           if-no-files-found: error
           retention-days: 7
 
   build_windows:
     name: Build Windows
-    if: ${{ inputs.os == 'all' || inputs.os == 'windows' }}
+    if: ${{ inputs.windows == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4 # v6.0.2
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/prepare_environment
         with:
           target_os: windows
           install_release_deps: true
 
-      - name: Compute build parameters
-        id: params
-        shell: bash
-        run: |
-          case "${{ inputs.channel }}" in
-            oss)
-              echo "features=release_bundle,standalone" >> $GITHUB_OUTPUT
-              echo "profile=release-lto" >> $GITHUB_OUTPUT
-              echo "bin=zap-oss" >> $GITHUB_OUTPUT
-              ;;
-            dev|preview|stable)
-              echo "features=release_bundle,crash_reporting" >> $GITHUB_OUTPUT
-              echo "profile=release-lto" >> $GITHUB_OUTPUT
-              echo "bin=zap-oss" >> $GITHUB_OUTPUT
-              ;;
-          esac
-          echo "extension=.exe" >> $GITHUB_OUTPUT
-
       - name: Build
         run: |
           cargo build -p warp `
-            --profile ${{ steps.params.outputs.profile }} `
-            --features "${{ steps.params.outputs.features }}" `
-            --bin ${{ steps.params.outputs.bin }}
+            --profile release `
+            --features "gui" `
+            --bin zap-oss
         shell: pwsh
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
       - name: Upload binary
-        uses: actions/upload-artifact@v4 # v4.6.2
+        uses: actions/upload-artifact@v4
         with:
-          name: zap-windows-${{ inputs.channel }}
-          path: target/${{ steps.params.outputs.profile == 'dev' && 'debug' || steps.params.outputs.profile }}/${{ steps.params.outputs.bin }}${{ steps.params.outputs.extension }}
+          name: zap-oss-windows
+          path: target/release/zap-oss.exe
           if-no-files-found: error
           retention-days: 7
