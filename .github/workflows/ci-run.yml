@@ -125,10 +125,27 @@ jobs:
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
-      - name: Upload binary
+      - name: Stage binary with DLLs
+        shell: pwsh
+        run: |
+          mkdir staging -Force
+          copy target/release/zap-oss.exe staging/
+          copy target/release/conpty.dll staging/
+          copy target/release/dxcompiler.dll staging/
+          copy target/release/dxil.dll staging/
+          copy target/release/OpenConsole.exe staging/
+          copy target/release/msvcp140.dll staging/
+          copy target/release/vcruntime140.dll staging/
+          copy target/release/vcruntime140_1.dll staging/
+          if (Test-Path target/release/x64/OpenConsole.exe) {
+            mkdir staging/x64 -Force
+            copy target/release/x64/OpenConsole.exe staging/x64/
+          }
+
+      - name: Upload staged directory
         uses: actions/upload-artifact@v4
         with:
           name: zap-oss-windows
-          path: target/release/zap-oss.exe
+          path: staging/
           if-no-files-found: error
           retention-days: 7
