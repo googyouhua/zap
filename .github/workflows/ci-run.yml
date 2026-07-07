@@ -116,9 +116,12 @@ jobs:
           install_release_deps: true
 
       - name: Build
-        id: build_binary
-        run: script/bundle -Channel oss -skip_build_installer --arch x64
-        shell: bash
+        run: |
+          cargo build -p warp `
+            --profile release `
+            --features "gui" `
+            --bin zap-oss
+        shell: pwsh
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
@@ -126,6 +129,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zap-oss-windows
-          path: ${{ steps.build_binary.outputs.binary_path }}
+          path: target/release/zap-oss.exe
           if-no-files-found: error
           retention-days: 7
