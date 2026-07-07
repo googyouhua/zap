@@ -312,6 +312,10 @@ fn copy_windows_assets(target_dir: &Path) {
         .join(WINDOWS_ASSETS_DIR)
         .join(target_arch);
 
+    // Ensure target directory exists before copying.
+    fs::create_dir_all(target_dir)
+        .unwrap_or_else(|err| panic!("Could not create target directory {target_dir:?}: {err:#}"));
+
     // Copy conpty.dll into target directory.
     fs::copy(
         windows_asset_dir.join(CONPTY_DLL_FILE),
