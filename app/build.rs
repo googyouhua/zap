@@ -125,22 +125,18 @@ fn main() -> Result<()> {
             );
         }
 
-        // Retrieve the Cargo profile name so that we can put a copy of ConPTY in
-        // the correct target subdirectory.
-        //
-        // We need to pass this information manually through an environment variable.
-        // Of the built-in variables set by Cargo: `OUT_DIR` is only a temporary
-        // directory, and `PROFILE` can only be `debug` or `release`.
-        // See https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
-        // for more on Cargo environment variables.
-        //
-        // Ideally we could access `CARGO_TARGET_DIR` but this doesn't exist at build time.
-        // See https://github.com/rust-lang/cargo/issues/9661.
-        //
-        // Cargo defaults to the `debug` profile.
-        let cargo_full_profile = env::var("CARGO_FULL_PROFILE").unwrap_or(String::from("debug"));
-        let target_dir =
-            app_target_dir(&cargo_full_profile).expect("Could not get app target directory");
+        // Determine the target output directory from OUT_DIR, which is set by Cargo
+        // to `<target>/<profile>/build/<pkg-id>/out/`. Walking up 3 levels gives the
+        // actual target profile directory (e.g. `target/release/`).
+        // We avoid relying on `CARGO_FULL_PROFILE` because it's not always available
+        // (older Cargo versions, or --profile aliases).
+        let out_dir = env::var("OUT_DIR").expect("OUT_DIR must be set");
+        let target_dir = std::path::Path::new(&out_dir)
+            .parent()
+            .and_then(std::path::Path::parent)
+            .and_then(std::path::Path::parent)
+            .expect("Could not derive target directory from OUT_DIR")
+            .to_path_buf();
         copy_windows_assets(&target_dir);
 
         #[cfg(windows)]
@@ -311,6 +307,10 @@ fn copy_windows_assets(target_dir: &Path) {
     let windows_asset_dir = Path::new(ASSETS_DIR)
         .join(WINDOWS_ASSETS_DIR)
         .join(target_arch);
+
+    // Ensure target directory exists before copying.
+    fs::create_dir_all(target_dir)
+        .unwrap_or_else(|err| panic!("Could not create target directory {target_dir:?}: {err:#}"));
 
     // Copy conpty.dll into target directory.
     fs::copy(
