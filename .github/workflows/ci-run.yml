@@ -62,7 +62,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zap-oss-linux
-          path: target/release/zap-oss
+          path: target/debug/zap-oss
           if-no-files-found: error
           retention-days: 7
 
@@ -96,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: zap-oss-macos
-          path: target/release/zap-oss
+          path: target/debug/zap-oss
           if-no-files-found: error
           retention-days: 7
 
@@ -122,40 +122,38 @@ jobs:
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
-      - name: List target/release/ DLLs
+      - name: List target/debug/ DLLs
         shell: pwsh
         run: |
-          Write-Host "=== target/release/ ==="
-          Get-ChildItem target/release/ -Name -Include *.dll,*.exe
-          if (Test-Path target/release/) {
-            $dlls = Get-ChildItem target/release/*.dll
+          Write-Host "=== target/debug/ ==="
+          Get-ChildItem target/debug/ -Name -Include *.dll,*.exe
+          if (Test-Path target/debug/) {
+            $dlls = Get-ChildItem target/debug/*.dll
             Write-Host "DLL count: $($dlls.Count)"
             $dlls | ForEach-Object { Write-Host "  $($_.Name) - $($_.Length) bytes" }
           }
-          if (Test-Path target/release/x64/) {
-            Write-Host "=== target/release/x64/ ==="
-            Get-ChildItem target/release/x64/ -Name
+          if (Test-Path target/debug/x64/) {
+            Write-Host "=== target/debug/x64/ ==="
+            Get-ChildItem target/debug/x64/ -Name
           }
 
       - name: Stage binary with DLLs
         shell: pwsh
         run: |
           mkdir staging -Force
-          copy target/release/zap-oss.exe staging/
-          # Copy all DLLs from target/release/
-          if (Test-Path target/release/conpty.dll) { copy target/release/conpty.dll staging/ }
-          if (Test-Path target/release/dxcompiler.dll) { copy target/release/dxcompiler.dll staging/ }
-          if (Test-Path target/release/dxil.dll) { copy target/release/dxil.dll staging/ }
-          if (Test-Path target/release/msvcp140.dll) { copy target/release/msvcp140.dll staging/ }
-          if (Test-Path target/release/vcruntime140.dll) { copy target/release/vcruntime140.dll staging/ }
-          if (Test-Path target/release/vcruntime140_1.dll) { copy target/release/vcruntime140_1.dll staging/ }
-          if (Test-Path target/release/OpenConsole.exe) {
-            copy target/release/OpenConsole.exe staging/
-          } elseif (Test-Path target/release/x64/OpenConsole.exe) {
+          copy target/debug/zap-oss.exe staging/
+          if (Test-Path target/debug/conpty.dll) { copy target/debug/conpty.dll staging/ }
+          if (Test-Path target/debug/dxcompiler.dll) { copy target/debug/dxcompiler.dll staging/ }
+          if (Test-Path target/debug/dxil.dll) { copy target/debug/dxil.dll staging/ }
+          if (Test-Path target/debug/msvcp140.dll) { copy target/debug/msvcp140.dll staging/ }
+          if (Test-Path target/debug/vcruntime140.dll) { copy target/debug/vcruntime140.dll staging/ }
+          if (Test-Path target/debug/vcruntime140_1.dll) { copy target/debug/vcruntime140_1.dll staging/ }
+          if (Test-Path target/debug/OpenConsole.exe) {
+            copy target/debug/OpenConsole.exe staging/
+          } elseif (Test-Path target/debug/x64/OpenConsole.exe) {
             mkdir staging/x64 -Force
-            copy target/release/x64/OpenConsole.exe staging/x64/
+            copy target/debug/x64/OpenConsole.exe staging/x64/
           }
-          # Verify
           if (-not (Test-Path staging/conpty.dll)) {
             throw "conpty.dll missing from staging"
           }
