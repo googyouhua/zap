@@ -52,24 +52,17 @@ jobs:
       - name: Build
         run: |
           cargo build -p warp \
-            --features "gui" \
+            --features "gui,release_bundle" \
             --bin zap-oss
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
-      - name: Stage binary with assets
-        run: |
-          mkdir -p staging/assets
-          cp target/debug/zap-oss staging/
-          cp -r app/assets/bundled staging/assets/
-        shell: bash
-
-      - name: Upload staged directory
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: zap-oss-linux
-          path: staging/
+          path: target/debug/zap-oss
           if-no-files-found: error
           retention-days: 7
 
@@ -93,24 +86,17 @@ jobs:
       - name: Build
         run: |
           cargo build -p warp \
-            --features "gui" \
+            --features "gui,release_bundle" \
             --bin zap-oss
         shell: bash
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
-      - name: Stage binary with assets
-        run: |
-          mkdir -p staging/assets
-          cp target/debug/zap-oss staging/
-          cp -r app/assets/bundled staging/assets/
-        shell: bash
-
-      - name: Upload staged directory
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: zap-oss-macos
-          path: staging/
+          path: target/debug/zap-oss
           if-no-files-found: error
           retention-days: 7
 
@@ -130,7 +116,7 @@ jobs:
       - name: Build
         run: |
           cargo build -p warp `
-            --features "gui" `
+            --features "gui,release_bundle" `
             --bin zap-oss
         shell: pwsh
         env:
@@ -151,7 +137,7 @@ jobs:
             Get-ChildItem target/debug/x64/ -Name
           }
 
-      - name: Stage binary with DLLs and assets
+      - name: Stage binary with DLLs
         shell: pwsh
         run: |
           mkdir staging -Force
@@ -168,9 +154,6 @@ jobs:
             mkdir staging/x64 -Force
             copy target/debug/x64/OpenConsole.exe staging/x64/
           }
-          # Copy bundled assets for runtime (rust-embed needs them in debug mode)
-          mkdir staging/assets -Force
-          copy app\assets\bundled staging\assets\bundled -Recurse
           if (-not (Test-Path staging/conpty.dll)) {
             throw "conpty.dll missing from staging"
           }
