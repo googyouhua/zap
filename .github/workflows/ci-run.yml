@@ -58,11 +58,18 @@ jobs:
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
-      - name: Upload binary
+      - name: Stage binary with assets
+        run: |
+          mkdir -p staging/assets
+          cp target/debug/zap-oss staging/
+          cp -r app/assets/bundled staging/assets/
+        shell: bash
+
+      - name: Upload staged directory
         uses: actions/upload-artifact@v4
         with:
           name: zap-oss-linux
-          path: target/debug/zap-oss
+          path: staging/
           if-no-files-found: error
           retention-days: 7
 
@@ -92,11 +99,18 @@ jobs:
         env:
           GIT_RELEASE_TAG: ${{ github.ref_name }}
 
-      - name: Upload binary
+      - name: Stage binary with assets
+        run: |
+          mkdir -p staging/assets
+          cp target/debug/zap-oss staging/
+          cp -r app/assets/bundled staging/assets/
+        shell: bash
+
+      - name: Upload staged directory
         uses: actions/upload-artifact@v4
         with:
           name: zap-oss-macos
-          path: target/debug/zap-oss
+          path: staging/
           if-no-files-found: error
           retention-days: 7
 
@@ -137,7 +151,7 @@ jobs:
             Get-ChildItem target/debug/x64/ -Name
           }
 
-      - name: Stage binary with DLLs
+      - name: Stage binary with DLLs and assets
         shell: pwsh
         run: |
           mkdir staging -Force
@@ -154,6 +168,9 @@ jobs:
             mkdir staging/x64 -Force
             copy target/debug/x64/OpenConsole.exe staging/x64/
           }
+          # Copy bundled assets for runtime (rust-embed needs them in debug mode)
+          mkdir staging/assets -Force
+          copy app\assets\bundled staging\assets\bundled -Recurse
           if (-not (Test-Path staging/conpty.dll)) {
             throw "conpty.dll missing from staging"
           }
