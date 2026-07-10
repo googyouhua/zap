@@ -10,7 +10,7 @@ use warp_util::path::ShellFamily;
 use warpui::{AppContext, ModelContext};
 use warpui::{Entity, SingletonEntity};
 
-use crate::terminal::ssh::util::{parse_interactive_ssh_command, SshWarpifyCommand};
+use crate::terminal::ssh::util::parse_interactive_ssh_command;
 
 // Cannot directly use Vec<Regex> here b/c Regex doesn't impl Eq, Serialize, and Deserialize.
 maybe_define_setting!(AddedSubshellCommands, group: WarpifySettings, {
@@ -388,13 +388,6 @@ impl WarpifySettings {
     pub fn is_compatible_subshell_command(&self, command: &str, shell_family: ShellFamily) -> bool {
         let command = command.trim();
         if Self::is_built_in_subshell_match(command) {
-            return true;
-        }
-
-        if !self.use_ssh_tmux_wrapper.value()
-            && SshWarpifyCommand::matches(command)
-                .is_some_and(|command| command.is_ssh_like_command())
-        {
             return true;
         }
 
