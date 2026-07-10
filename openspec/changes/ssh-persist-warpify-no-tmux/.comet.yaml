@@ -1,5 +1,5 @@
 workflow: hotfix
-phase: verify
+phase: build
 context_compression: off
 build_mode: direct
 build_pause: null
