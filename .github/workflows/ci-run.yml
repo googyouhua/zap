@@ -103,7 +103,7 @@ jobs:
   build_windows:
     name: Build Windows
     if: ${{ fromJSON(inputs.windows) }}
-    runs-on: windows-latest
+    runs-on: [self-host-windows]
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
