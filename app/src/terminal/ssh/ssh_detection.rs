@@ -28,7 +28,8 @@ pub fn evaluate_warpify_ssh_host(
     shell_family: ShellFamily,
     warpify_settings: &WarpifySettings,
 ) -> SshInteractiveSessionDetected {
-    let should_prompt_ssh_tmux_wrapper = *warpify_settings.enable_ssh_warpification.value();
+    let should_prompt_ssh_tmux_wrapper = *warpify_settings.enable_ssh_warpification.value()
+        && *warpify_settings.use_ssh_tmux_wrapper.value();
     let matches_subshell = warpify_settings.is_denylisted_subshell_command(command)
         || warpify_settings.is_compatible_subshell_command(command, shell_family);
     if !should_prompt_ssh_tmux_wrapper

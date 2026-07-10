@@ -1,4 +1,0 @@
-- [ ] 1.1 修改 Linux oss 的 profile 和 features
-- [ ] 1.2 修改 macOS oss 的 profile 和 features
-- [ ] 1.3 修改 Windows oss 的 profile 和 features
-- [ ] 1.4 提交并推送
