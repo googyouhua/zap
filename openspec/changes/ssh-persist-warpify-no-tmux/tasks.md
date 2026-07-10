@@ -1,0 +1,5 @@
+- [x] 1.1 分析问题并创建 proposal/design
+- [x] 1.2 修改 `ssh_detection.rs`: 将 `use_ssh_tmux_wrapper` 从 warpification 闸门中移除
+- [x] 1.3 修改 `view.rs`: `handle_remote_warpification_is_unavailable` 中 `TmuxNotInstalled` 时，若 `use_ssh_tmux_wrapper = false`，跳过 install dialog 直接 shell integration
+- [x] 1.4 cargo check 验证
+- [x] 1.5 提交 commit

@@ -7760,6 +7760,13 @@ impl TerminalView {
                 system_details,
                 root_access,
             } => {
+                if !*WarpifySettings::as_ref(ctx).use_ssh_tmux_wrapper.value() {
+                    if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
+                        self.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
+                        return;
+                    }
+                }
+
                 if system_details.writable_home != Some(true) {
                     if let Some(shell_type) = ShellType::from_name(&system_details.shell) {
                         self.trigger_subshell_bootstrap(Some(shell_type), false, ctx);
