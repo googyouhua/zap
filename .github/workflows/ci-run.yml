@@ -116,6 +116,12 @@ jobs:
         shell: pwsh
         run: echo "CARGO_HOME=C:\cargo" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Set up Strawberry Perl for OpenSSL
+        shell: pwsh
+        run: |
+          "C:/Strawberry/perl/bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          "OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Install protoc
         shell: pwsh
         run: |
