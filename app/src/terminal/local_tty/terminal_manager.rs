@@ -480,6 +480,18 @@ impl TerminalManager {
             .lock()
             .set_pending_shell_launch_data(shell_launch_data.clone());
 
+        // Pass the SSH host denylist to the shell (for the ssh() bash function override).
+        let mut env_vars = env_vars;
+        let deny_hosts = WarpifySettings::as_ref(ctx)
+            .ssh_hosts_denylist
+            .join(",");
+        if !deny_hosts.is_empty() {
+            env_vars.insert(
+                OsString::from("WARP_SSH_DENY_HOSTS"),
+                OsString::from(deny_hosts),
+            );
+        }
+
         // Enqueue the init shell script (for shells that need it), then create
         // the PTY and start its corresponding event loop.
         let model = self.model();

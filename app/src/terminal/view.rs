@@ -9934,13 +9934,9 @@ impl TerminalView {
                     .is_denylisted_subshell_command(command)
                     || warpify_settings.is_denylisted_subshell_command(warpify_command);
                 // Check if the SSH host is denylisted (even in subshell path).
-                let ssh_host = parse_interactive_ssh_command(warpify_command).and_then(|cmd| cmd.host);
-                let ssh_host_denylisted = ssh_host
-                    .as_deref()
-                    .is_some_and(|host| warpify_settings.is_ssh_host_denylisted(host));
-                log::info!(
-                    "subshell detection: cmd={warpify_command}, host={ssh_host:?}, denylisted={ssh_host_denylisted}"
-                );
+                let ssh_host_denylisted = parse_interactive_ssh_command(warpify_command)
+                    .and_then(|cmd| cmd.host)
+                    .is_some_and(|host| warpify_settings.is_ssh_host_denylisted(&host));
                 // Never warpify or surface warpification for agent-requested commands.
                 let has_ai_metadata = self
                     .model
