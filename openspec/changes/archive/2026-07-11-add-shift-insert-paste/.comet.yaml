@@ -17,6 +17,6 @@ verification_report: docs/superpowers/reports/2026-07-03-add-shift-insert-paste-
 branch_status: handled
 created_at: 2026-07-03
 verified_at: 2026-07-03
-archived: false
+archived: true
 handoff_context: openspec/changes/add-shift-insert-paste/.comet/handoff/design-context.json
 handoff_hash: 59e4474b4b669d48c93db23b187e6f90d04d1cce4cf6dc972de207598a0c7247

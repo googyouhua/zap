@@ -2,6 +2,8 @@
 comet_change: add-shift-insert-paste
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-11-add-shift-insert-paste
+status: final
 ---
 
 # Shift+Insert 粘贴快捷键设计

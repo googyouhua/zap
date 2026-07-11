@@ -2,6 +2,7 @@
 change: add-shift-insert-paste
 design-doc: docs/superpowers/specs/2026-07-03-shift-insert-paste-design.md
 base-ref: 5c145ccd27925c6710d6f6194a0f6817866dbc52
+archived-with: 2026-07-11-add-shift-insert-paste
 ---
 
 # Shift+Insert 粘贴快捷键实现计划
@@ -14,6 +15,7 @@ base-ref: 5c145ccd27925c6710d6f6194a0f6817866dbc52
 
 **Tech Stack:** Rust, WarpUI keymap。
 
+archived-with: 2026-07-11-add-shift-insert-paste
 ---
 
 ### 任务 1: 注册键绑定
