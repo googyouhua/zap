@@ -9951,6 +9951,7 @@ impl TerminalView {
                 let ssh_host_denylisted = parse_interactive_ssh_command(warpify_command)
                     .and_then(|cmd| cmd.host)
                     .is_some_and(|host| warpify_settings.is_ssh_host_denylisted(&host));
+                log::info!("AfterBlockStarted: compat_shell={}, denylisted={}", is_compatible_subshell_command, ssh_host_denylisted);
                 // Never warpify or surface warpification for agent-requested commands.
                 let has_ai_metadata = self
                     .model
@@ -23243,11 +23244,13 @@ impl TerminalView {
                 );
             }
             SshLoginStatus::ReadyToWarpify => {
+                log::info!("ReadyToWarpify fired");
                 // After the confirmation check, we are confident enough to auto-warpify or offer warpification.
                 let Some(command) = &self.warpify_state.get_pending_ssh_command() else {
                     return;
                 };
                 let ssh_host = &self.warpify_state.get_pending_ssh_host();
+                log::info!("  command={:?}, ssh_host={:?}", command, ssh_host);
 
                 let shell_family = self.shell_family(ctx);
                 let warpify_settings = WarpifySettings::as_ref(ctx);
@@ -23259,6 +23262,7 @@ impl TerminalView {
                     warpify_settings,
                 );
 
+                log::info!("  evaluate result: {:?}", ssh_interactive_session_event);
                 if let SshInteractiveSessionDetected::ShouldPromptWarpification {
                     ref host,
                     ref command,
@@ -23312,16 +23316,20 @@ impl TerminalView {
 
     /// Shows the warpify footer for a detected subshell/SSH command.
     fn show_warpify_footer(&mut self, mode: WarpificationMode, ctx: &mut ViewContext<Self>) {
+        log::info!("show_warpify_footer called: mode_is_ssh={}", mode.is_ssh());
         // Check SSH host denylist for both SSH and subshell modes.
         if !*WarpifySettings::as_ref(ctx).use_ssh_tmux_wrapper.value() {
             let cmd = match &mode {
                 WarpificationMode::Ssh { command, .. } => command.as_str(),
                 WarpificationMode::Subshell { command } => command.as_str(),
             };
-            let is_denied = parse_interactive_ssh_command(cmd)
+            let parsed = parse_interactive_ssh_command(cmd);
+            log::info!("  footer denylist check: cmd={}, parsed={}", cmd, parsed.is_some());
+            let is_denied = parsed
                 .and_then(|p| p.host)
                 .is_some_and(|h| WarpifySettings::as_ref(ctx).is_ssh_host_denylisted(&h));
             if is_denied {
+                log::info!("  DENIED by denylist, returning early");
                 return;
             }
         }
