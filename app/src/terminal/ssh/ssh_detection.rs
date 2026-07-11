@@ -28,6 +28,13 @@ pub fn evaluate_warpify_ssh_host(
     shell_family: ShellFamily,
     warpify_settings: &WarpifySettings,
 ) -> SshInteractiveSessionDetected {
+    // Denylist check first: regardless of tmux wrapper settings, deny listed hosts.
+    if let Some(ssh_host) = ssh_host {
+        if warpify_settings.is_ssh_host_denylisted(ssh_host) {
+            return SshInteractiveSessionDetected::HostDenylisted;
+        }
+    }
+
     let should_prompt_ssh_tmux_wrapper = *warpify_settings.enable_ssh_warpification.value()
         && *warpify_settings.use_ssh_tmux_wrapper.value();
     let matches_subshell = warpify_settings.is_denylisted_subshell_command(command)
@@ -37,12 +44,6 @@ pub fn evaluate_warpify_ssh_host(
         || !FeatureFlag::SSHTmuxWrapper.is_enabled()
     {
         return SshInteractiveSessionDetected::FeatureDisabled;
-    }
-
-    if let Some(ssh_host) = ssh_host {
-        if warpify_settings.is_ssh_host_denylisted(ssh_host) {
-            return SshInteractiveSessionDetected::HostDenylisted;
-        }
     }
 
     SshInteractiveSessionDetected::ShouldPromptWarpification {

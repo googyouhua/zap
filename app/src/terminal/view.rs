@@ -9933,6 +9933,10 @@ impl TerminalView {
                 let command_is_denylisted = warpify_settings
                     .is_denylisted_subshell_command(command)
                     || warpify_settings.is_denylisted_subshell_command(warpify_command);
+                // Check if the SSH host is denylisted (even in subshell path).
+                let ssh_host_denylisted = parse_interactive_ssh_command(warpify_command)
+                    .and_then(|cmd| cmd.host)
+                    .is_some_and(|host| warpify_settings.is_ssh_host_denylisted(&host));
                 // Never warpify or surface warpification for agent-requested commands.
                 let has_ai_metadata = self
                     .model
@@ -9943,7 +9947,7 @@ impl TerminalView {
                     .is_some();
 
                 if is_compatible_subshell_command {
-                    if command_is_denylisted || has_ai_metadata {
+                    if command_is_denylisted || ssh_host_denylisted || has_ai_metadata {
                         // Don't auto-warpify or surface warpification for these commands.
                     } else if let Some(shell_type) = self.pending_auto_bootstrap_shell_type.take() {
                         // If there is a subshell we're waiting to bootstrap until we receive
