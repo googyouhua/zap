@@ -1067,6 +1067,36 @@ esac
 
                 # If the SSH wrapper is not enabled for this session, don't use it.
                 if [ "$WARP_USE_SSH_WRAPPER" = "1" ]; then
+                    # Check if the target host is in the denylist.
+                    if [ -n "$WARP_SSH_DENY_HOSTS" ]; then
+                        local _ssh_host=""
+                        local _skip=false
+                        for _arg in "$@"; do
+                            if $_skip; then _skip=false; continue; fi
+                            case "$_arg" in
+                                -[BbcDeEFiIJlLmOoPQRSw]) _skip=true ;;
+                                -p) _skip=true ;;
+                                -[1246AaCfgKkMNnqsTtVvXxY]|-[^-]*) ;;
+                                *)
+                                    if [ -z "$_ssh_host" ]; then
+                                        _ssh_host="${_arg##*@}"
+                                    fi
+                                    ;;
+                            esac
+                        done
+                        if [ -n "$_ssh_host" ]; then
+                            local _old_ifs="$IFS"
+                            IFS=","
+                            for _denied in $WARP_SSH_DENY_HOSTS; do
+                                if [ "$_ssh_host" = "$_denied" ]; then
+                                    IFS="$_old_ifs"
+                                    command ssh "$@"
+                                    return
+                                fi
+                            done
+                            IFS="$_old_ifs"
+                        fi
+                    fi
                     local TRACE_FLAG_IF_WARP_SHELL_DEBUG_MODE=""
                     if [[ "$WARP_SHELL_DEBUG_MODE" == "1" ]]; then
                         TRACE_FLAG_IF_WARP_SHELL_DEBUG_MODE="-x"
