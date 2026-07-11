@@ -800,31 +800,23 @@ impl SettingsWidget for SSHWidget {
                         .finish(),
                 );
 
-                if enable_ssh_warpification {
-                    let warpify_settings = WarpifySettings::as_ref(app);
-                    column.add_child(
-                        view.build_input_list(
-                            crate::t!("settings-warpify-denylisted-hosts"),
-                            &warpify_settings.ssh_hosts_denylist,
-                            &view.remove_denylisted_ssh_button_states,
-                            WarpifyPageAction::RemoveDenylistedSshHost,
-                            &view.add_denylisted_ssh_editor,
-                            appearance,
-                        )
-                        .finish(),
-                    );
-                } else {
-                    // Add margin to hint the user should scroll to see more.
-                    column.add_child(
-                        Container::new(Flex::column().finish())
-                            .with_margin_bottom(styles::MINIMUM_SCROLL_OFFSET_AFTER_SSH)
-                            .finish(),
-                    );
-                }
-
                 column.finish()
             },
         );
+
+        if enable_ssh_warpification {
+            column.add_child(
+                view.build_input_list(
+                    crate::t!("settings-warpify-denylisted-hosts"),
+                    &WarpifySettings::as_ref(app).ssh_hosts_denylist,
+                    &view.remove_denylisted_ssh_button_states,
+                    WarpifyPageAction::RemoveDenylistedSshHost,
+                    &view.add_denylisted_ssh_editor,
+                    appearance,
+                )
+                .finish(),
+            );
+        }
 
         column.finish()
     }
