@@ -1,5 +1,5 @@
 workflow: hotfix
-phase: verify
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -12,9 +12,9 @@ auto_transition: true
 base_ref: 02fbaaa7cbe40b28b44c70ea7a0c2f26556fbd18
 design_doc: null
 plan: null
-verify_result: pending
-verification_report: docs/superpowers/reports/2026-07-03-fix-shift-insert-paste-linux-block-mode-verify.md
-branch_status: pending
+verify_result: pass
+verification_report: docs/superpowers/reports/2026-07-11-fix-shift-insert-paste-linux-block-mode-verify.md
+branch_status: handled
 created_at: 2026-07-03
-verified_at: null
-archived: false
+verified_at: 2026-07-11
+archived: true
