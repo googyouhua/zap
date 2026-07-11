@@ -1,0 +1,15 @@
+{
+  "change": "ssh-denylist-edit-support",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "272f8afc9fbb4212864bdf7c13f39f2a621c1eebd52cec0b4545121eae5d507f",
+  "files": [
+    { "path": "openspec/changes/ssh-denylist-edit-support/proposal.md", "sha256": "aebfc8c2305606332d142e888070f46e10c2952135970bb93eb9aa33f567f75d" },
+    { "path": "openspec/changes/ssh-denylist-edit-support/design.md", "sha256": "56425ef99b7b38922c7b4d8fd389795f40ea2dfe3003b9c276f9465181a5b7bf" },
+    { "path": "openspec/changes/ssh-denylist-edit-support/tasks.md", "sha256": "0319c8e32414871896abd8f5efa2a492a372f1f681e07bac9009e4c4b65dc0f9" },
+    { "path": "openspec/changes/ssh-denylist-edit-support/specs/ssh-denylist-batch-add/spec.md", "sha256": "1d5835e44512ef2f4a32ea4d68172fd6646b9beb1cd62b156f2e2997330e4fcb" },
+    { "path": "openspec/changes/ssh-denylist-edit-support/specs/ssh-denylist-edit/spec.md", "sha256": "4bc93a1652ba6941920b903cdf7f5360bf39cd29af6b915a3ca4665669f3fcd9" }
+  ]
+}
