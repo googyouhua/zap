@@ -1,0 +1,5 @@
+- [x] 1.1 调研 denylist 在 Windows 不可见的原因
+- [x] 1.2 将 denylist 移出 use_ssh_tmux_wrapper 的 add_setting 块
+- [x] 1.3 cargo check 验证
+- [x] 1.4 提交 commit
+- [ ] 1.5 推送并创建 PR
