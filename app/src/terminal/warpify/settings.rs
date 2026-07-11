@@ -398,11 +398,16 @@ impl WarpifySettings {
         }
 
         // While in-band generators are our best option for warpifying ssh sessions from powershell, hard-code
-        // the warpify subshell banner to show up.
-        if matches!(shell_family, ShellFamily::PowerShell)
-            && parse_interactive_ssh_command(command).is_some()
-        {
-            return true;
+        // the warpify subshell banner to show up. But respect the host denylist.
+        if matches!(shell_family, ShellFamily::PowerShell) {
+            if let Some(host) = parse_interactive_ssh_command(command).and_then(|c| c.host) {
+                if !self.is_ssh_host_denylisted(&host) {
+                    return true;
+                }
+            } else {
+                // Non-SSH PowerShell commands or SSH without a host are fine to surface.
+                return true;
+            }
         }
 
         false
