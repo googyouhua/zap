@@ -8412,20 +8412,6 @@ impl TerminalView {
         telemetry_event: TelemetryEvent,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Check SSH host denylist for both SSH and subshell modes.
-        if !*WarpifySettings::as_ref(ctx).use_ssh_tmux_wrapper.value() {
-            let cmd = match &input {
-                WarpificationMode::Ssh { command, .. } => command.as_str(),
-                WarpificationMode::Subshell { command } => command.as_str(),
-            };
-            let is_denied = parse_interactive_ssh_command(cmd)
-                .and_then(|p| p.host)
-                .is_some_and(|h| WarpifySettings::as_ref(ctx).is_ssh_host_denylisted(&h));
-            if is_denied {
-                return;
-            }
-        }
-
         if FeatureFlag::WarpifyFooter.is_enabled() {
             return;
         }
@@ -23322,20 +23308,6 @@ impl TerminalView {
 
     /// Shows the warpify footer for a detected subshell/SSH command.
     fn show_warpify_footer(&mut self, mode: WarpificationMode, ctx: &mut ViewContext<Self>) {
-        // Check SSH host denylist for both SSH and subshell modes.
-        if !*WarpifySettings::as_ref(ctx).use_ssh_tmux_wrapper.value() {
-            let cmd = match &mode {
-                WarpificationMode::Ssh { command, .. } => command.as_str(),
-                WarpificationMode::Subshell { command } => command.as_str(),
-            };
-            let is_denied = parse_interactive_ssh_command(cmd)
-                .and_then(|p| p.host)
-                .is_some_and(|h| WarpifySettings::as_ref(ctx).is_ssh_host_denylisted(&h));
-            if is_denied {
-                return;
-            }
-        }
-
         let model = self.model.lock();
 
         // Shared session viewers can't initiate warpification currently.
