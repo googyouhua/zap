@@ -8221,12 +8221,14 @@ impl TerminalView {
         telemetry_event: TelemetryEvent,
         ctx: &mut ViewContext<Self>,
     ) {
+        if input.is_ssh() && !*WarpifySettings::as_ref(ctx).use_ssh_tmux_wrapper.value() {
+            return;
+        }
         if FeatureFlag::WarpifyFooter.is_enabled() {
             return;
         }
 
         let mut model = self.model.lock();
-
         // Shared session viewers can't initiate warpification currently.
         // Don't show the warpify banner when an agent is monitoring the command either.
         if model.shared_session_status().is_viewer()
@@ -23090,6 +23092,9 @@ impl TerminalView {
 
     /// Shows the warpify footer for a detected subshell/SSH command.
     fn show_warpify_footer(&mut self, mode: WarpificationMode, ctx: &mut ViewContext<Self>) {
+        if mode.is_ssh() && !*WarpifySettings::as_ref(ctx).use_ssh_tmux_wrapper.value() {
+            return;
+        }
         let model = self.model.lock();
 
         // Shared session viewers can't initiate warpification currently.

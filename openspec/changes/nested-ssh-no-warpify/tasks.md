@@ -1,0 +1,5 @@
+- [x] 1.1 创建 proposal/design/tasks artifact
+- [x] 1.2 `show_warpify_footer` 中加入 session 检查：已 warpify 时跳过
+- [x] 1.3 `show_warpify_banner` 中加入 session 检查：已 warpify 时跳过
+- [x] 1.4 cargo check 验证
+- [x] 1.5 提交 commit
