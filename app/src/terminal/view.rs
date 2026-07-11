@@ -7937,7 +7937,6 @@ impl TerminalView {
         // If the target host is denylisted, skip the tmux install dialog entirely.
         if let Some(host) = self.warpify_state.get_pending_ssh_host() {
             if WarpifySettings::as_ref(ctx).is_ssh_host_denylisted(&host) {
-                log::info!("RemoteWarpificationIsUnavailable: host {host} is denylisted, skipping");
                 return;
             }
         }
