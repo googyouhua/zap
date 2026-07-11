@@ -1,0 +1,7 @@
+- [x] 1.1 ssh_detection.rs: denylist 检查移至 FeatureDisabled return 之前
+- [x] 1.2 view.rs: subshell 路径增加 ssh_host_denylisted 检查
+- [x] 1.3 terminal_manager.rs: WARP_SSH_DENY_HOSTS 环境变量传递给 shell
+- [x] 1.4 bash_body.sh: ssh() 函数检查 denylist，跳过 legacy wrapper
+- [x] 1.5 warpify_page.rs: denylist UI 移出 use_ssh_tmux_wrapper block
+- [x] 1.6 cargo check 验证
+- [x] 1.7 提交并推送

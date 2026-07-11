@@ -10,7 +10,7 @@ use warp_util::path::ShellFamily;
 use warpui::{AppContext, ModelContext};
 use warpui::{Entity, SingletonEntity};
 
-use crate::terminal::ssh::util::{parse_interactive_ssh_command, SshWarpifyCommand};
+use crate::terminal::ssh::util::parse_interactive_ssh_command;
 
 // Cannot directly use Vec<Regex> here b/c Regex doesn't impl Eq, Serialize, and Deserialize.
 maybe_define_setting!(AddedSubshellCommands, group: WarpifySettings, {
@@ -391,13 +391,6 @@ impl WarpifySettings {
             return true;
         }
 
-        if !self.use_ssh_tmux_wrapper.value()
-            && SshWarpifyCommand::matches(command)
-                .is_some_and(|command| command.is_ssh_like_command())
-        {
-            return true;
-        }
-
         for command_regex in self.parsed_added_subshell_commands.iter().flatten() {
             if command_regex.is_match(command) {
                 return true;
@@ -405,11 +398,16 @@ impl WarpifySettings {
         }
 
         // While in-band generators are our best option for warpifying ssh sessions from powershell, hard-code
-        // the warpify subshell banner to show up.
-        if matches!(shell_family, ShellFamily::PowerShell)
-            && parse_interactive_ssh_command(command).is_some()
-        {
-            return true;
+        // the warpify subshell banner to show up. But respect the host denylist.
+        if matches!(shell_family, ShellFamily::PowerShell) {
+            if let Some(host) = parse_interactive_ssh_command(command).and_then(|c| c.host) {
+                if !self.is_ssh_host_denylisted(&host) {
+                    return true;
+                }
+            } else {
+                // Non-SSH PowerShell commands or SSH without a host are fine to surface.
+                return true;
+            }
         }
 
         false
