@@ -9,6 +9,7 @@ use strum::IntoEnumIterator;
 use warp_core::features::FeatureFlag;
 use warpui::elements::{FormattedTextElement, HighlightedHyperlink};
 use warpui::keymap::ContextPredicate;
+
 use warpui::{
     elements::{Container, Flex, MouseStateHandle, ParentElement},
     presenter::ChildView,
@@ -91,6 +92,7 @@ pub struct WarpifyPageView {
 
     remove_denylisted_ssh_button_states: Vec<MouseStateHandle>,
     add_denylisted_ssh_editor: ViewHandle<SubmittableTextInput>,
+    pending_edit_ssh_host_index: Option<usize>,
 
     ssh_extension_install_mode_dropdown: ViewHandle<Dropdown<WarpifyPageAction>>,
 }
@@ -158,6 +160,7 @@ impl WarpifyPageView {
             add_denylisted_commands_editor,
             remove_denylisted_ssh_button_states: Default::default(),
             add_denylisted_ssh_editor,
+            pending_edit_ssh_host_index: None,
             ssh_extension_install_mode_dropdown,
         };
 
@@ -282,13 +285,33 @@ impl WarpifyPageView {
     ) {
         match event {
             SubmittableTextInputEvent::Submit(new_command) => {
+                let edit_index = self.pending_edit_ssh_host_index.take();
                 WarpifySettings::handle(ctx).update(ctx, |warpify_settings, ctx| {
-                    warpify_settings.denylist_ssh_host(new_command, ctx);
+                    // Split by semi-colon for batch add
+                    for host in new_command.split(';') {
+                        let host = host.trim();
+                        if host.is_empty() {
+                            continue;
+                        }
+                        if let Some(idx) = edit_index {
+                            // Replace the entry being edited: remove old, add new
+                            let mut new_list = warpify_settings.ssh_hosts_denylist.to_vec();
+                            new_list[idx] = host.to_string();
+                            warpify_settings.ssh_hosts_denylist
+                                .set_value(new_list, ctx)
+                                .expect("ssh_hosts_denylist failed to serialize");
+                            // Only replace at the edit index, don't process more splits
+                            break;
+                        }
+                        warpify_settings.denylist_ssh_host(host, ctx);
+                    }
                 });
-
                 send_telemetry_from_ctx!(TelemetryEvent::AddDenylistedSshTmuxWrapperHost, ctx);
             }
-            SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
+            SubmittableTextInputEvent::Escape => {
+                self.pending_edit_ssh_host_index = None;
+                ctx.emit(SettingsPageEvent::FocusModal);
+            }
         }
     }
 
@@ -426,6 +449,7 @@ pub enum WarpifyPageAction {
     RemoveAddedCommand(usize),
     RemoveDenylistedCommand(usize),
     RemoveDenylistedSshHost(usize),
+    EditDenylistedSshHost(usize),
     /// If disabled, auto-Warpification and the SSH Warpification prompt will be disabled.
     ToggleTmuxWarpification,
     ToggleSshWarpification,
@@ -492,6 +516,20 @@ impl TypedActionView for WarpifyPageView {
             }
             WarpifyPageAction::RemoveDenylistedSshHost(index) => {
                 self.remove_denylisted_ssh_host(*index, ctx);
+            }
+            WarpifyPageAction::EditDenylistedSshHost(index) => {
+                let host = WarpifySettings::as_ref(ctx)
+                    .ssh_hosts_denylist
+                    .get(*index)
+                    .cloned();
+                if let Some(host) = host {
+                    self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
+                        editor.editor().update(ctx, |e, ctx| {
+                            e.system_reset_buffer_text(&host, ctx);
+                        });
+                    });
+                    self.pending_edit_ssh_host_index = Some(*index);
+                }
             }
             OpenUrl(url) => {
                 ctx.open_url(url.as_str());
