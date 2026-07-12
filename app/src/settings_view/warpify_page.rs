@@ -31,7 +31,6 @@ use crate::ui_components::blended_colors;
 
 use crate::{
     appearance::Appearance,
-    editor::{Event as EditorEvent, EditorView},
     report_if_error, send_telemetry_from_ctx,
     server::telemetry::TelemetryEvent,
     terminal::warpify::settings::WarpifySettings,
@@ -155,15 +154,6 @@ impl WarpifyPageView {
         ctx.subscribe_to_view(
             &add_denylisted_ssh_editor,
             Self::handle_denylisted_ssh_editor_event,
-        );
-
-        // Subscribe to the inner EditorView's Blurred to discard edit when clicking other inputs.
-        let deny_ssh_editor_handle = add_denylisted_ssh_editor.read(ctx, |editor, _| {
-            editor.editor().clone()
-        });
-        ctx.subscribe_to_view(
-            &deny_ssh_editor_handle,
-            Self::handle_denylisted_ssh_blur_event,
         );
 
         let ssh_extension_install_mode_dropdown =
@@ -297,27 +287,6 @@ impl WarpifyPageView {
                 send_telemetry_from_ctx!(TelemetryEvent::AddDenylistedSubshellCommand, ctx);
             }
             SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
-        }
-    }
-
-    fn handle_denylisted_ssh_blur_event(
-        &mut self,
-        _handle: ViewHandle<EditorView>,
-        event: &EditorEvent,
-        ctx: &mut ViewContext<Self>,
-    ) {
-        if matches!(event, EditorEvent::Blurred) {
-            let idx = self.pending_edit_ssh_host_index.take();
-            log::info!("[DENYLIST] Blurred, pending={:?}", idx);
-            if let Some(original) = idx.and_then(|i| {
-                WarpifySettings::as_ref(ctx).ssh_hosts_denylist.get(i).cloned()
-            }) {
-                self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
-                    editor.editor().update(ctx, |e, ctx| {
-                        e.system_reset_buffer_text(&original, ctx);
-                    });
-                });
-            }
         }
     }
 
@@ -590,13 +559,13 @@ impl TypedActionView for WarpifyPageView {
                     .get(*index)
                     .cloned();
                 if let Some(host) = host {
+                    self.pending_edit_ssh_host_index = Some(*index);
                     self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
                         editor.editor().update(ctx, |e, ctx| {
                             e.system_reset_buffer_text(&host, ctx);
                         });
                     });
                     ctx.focus(&self.add_denylisted_ssh_editor);
-                    self.pending_edit_ssh_host_index = Some(*index);
                     ctx.notify();
                 }
             }
