@@ -397,18 +397,9 @@ fn build_sub_sub_title(title: String, appearance: &Appearance) -> Container {
 const SSH_EXTENSION_DROPDOWN_WIDTH: f32 = 250.;
 
 impl WarpifyPageView {
-    /// Discards any in-progress denylist edit: restores original text and exits edit mode.
-    fn discard_denylist_edit(&mut self, ctx: &mut ViewContext<Self>) {
-        let idx = self.pending_edit_ssh_host_index.take();
-        if let Some(original) = idx.and_then(|i| {
-            WarpifySettings::as_ref(ctx).ssh_hosts_denylist.get(i).cloned()
-        }) {
-            self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
-                editor.editor().update(ctx, |e, ctx| {
-                    e.system_reset_buffer_text(&original, ctx);
-                });
-            });
-        }
+    /// Discards any in-progress denylist edit: exits edit mode without touching editor content.
+    fn discard_denylist_edit(&mut self, _ctx: &mut ViewContext<Self>) {
+        self.pending_edit_ssh_host_index = None;
     }
 
     fn create_ssh_extension_install_mode_dropdown(
