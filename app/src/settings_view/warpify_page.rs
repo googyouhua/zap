@@ -31,6 +31,7 @@ use crate::ui_components::blended_colors;
 
 use crate::{
     appearance::Appearance,
+    editor::{Event as EditorEvent, EditorView},
     report_if_error, send_telemetry_from_ctx,
     server::telemetry::TelemetryEvent,
     terminal::warpify::settings::WarpifySettings,
@@ -154,6 +155,15 @@ impl WarpifyPageView {
         ctx.subscribe_to_view(
             &add_denylisted_ssh_editor,
             Self::handle_denylisted_ssh_editor_event,
+        );
+
+        // Subscribe to the inner EditorView's Blurred to discard edit when clicking other inputs.
+        let deny_ssh_editor_handle = add_denylisted_ssh_editor.read(ctx, |editor, _| {
+            editor.editor().clone()
+        });
+        ctx.subscribe_to_view(
+            &deny_ssh_editor_handle,
+            Self::handle_denylisted_ssh_blur_event,
         );
 
         let ssh_extension_install_mode_dropdown =
@@ -287,6 +297,17 @@ impl WarpifyPageView {
                 send_telemetry_from_ctx!(TelemetryEvent::AddDenylistedSubshellCommand, ctx);
             }
             SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
+        }
+    }
+
+    fn handle_denylisted_ssh_blur_event(
+        &mut self,
+        _handle: ViewHandle<EditorView>,
+        event: &EditorEvent,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if matches!(event, EditorEvent::Blurred) {
+            self.discard_denylist_edit(ctx);
         }
     }
 
