@@ -540,6 +540,7 @@ impl TypedActionView for WarpifyPageView {
                             e.system_reset_buffer_text(&host, ctx);
                         });
                     });
+                    ctx.focus(&self.add_denylisted_ssh_editor);
                     self.pending_edit_ssh_host_index = Some(*index);
                 }
             }
