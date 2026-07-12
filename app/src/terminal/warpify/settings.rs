@@ -477,7 +477,6 @@ impl WarpifySettings {
     /// The user has indicated that they don't want to be asked to bootstrap an ssh session
     /// for this host, so save it in user-defaults.
     pub fn denylist_ssh_host(&mut self, host_to_denylist: &str, ctx: &mut ModelContext<Self>) {
-        log::info!("[DENYLIST] denylist_ssh_host({:?})", host_to_denylist);
         let mut new_denylist = self.ssh_hosts_denylist.to_vec();
         new_denylist.push(host_to_denylist.trim().to_owned());
         Self::write_denylist_file(&new_denylist);

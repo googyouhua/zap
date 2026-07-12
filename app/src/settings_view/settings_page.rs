@@ -192,6 +192,7 @@ impl SettingsPage {
 #[derive(PartialEq, Eq)]
 pub enum SettingsPageEvent {
     FocusModal,
+    Deactivate,
     Pane(PaneEventWrapper),
     // Zap Wave 7-3:`EnvironmentSetupModeSelectorToggled` /
     // `AgentAssistedEnvironmentModalToggled` 随 ambient-agent UI 子系统物理删。

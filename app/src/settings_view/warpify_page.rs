@@ -310,7 +310,6 @@ impl WarpifyPageView {
             SubmittableTextInputEvent::Submit(new_command) => {
                 let edit_index = self.pending_edit_ssh_host_index.take();
                 let host = new_command.trim().to_string();
-                log::info!("[DENYLIST] Submit: host={:?}, edit_idx={:?}", host, edit_index);
                 if host.is_empty() {
                     return;
                 }
@@ -332,7 +331,6 @@ impl WarpifyPageView {
                 ctx.notify();
             }
             SubmittableTextInputEvent::Escape => {
-                log::info!("[DENYLIST] Escape, pending={:?}", self.pending_edit_ssh_host_index);
                 let edit_idx = self.pending_edit_ssh_host_index.take();
                 if let Some(original) = edit_idx.and_then(|idx| {
                     WarpifySettings::as_ref(ctx).ssh_hosts_denylist.get(idx).cloned()
@@ -520,9 +518,6 @@ impl TypedActionView for WarpifyPageView {
         use WarpifyPageAction::*;
         // Any action other than starting an edit cancels the in-progress edit.
         if !matches!(action, EditDenylistedSshHost(_)) {
-            if self.pending_edit_ssh_host_index.is_some() {
-                log::info!("[DENYLIST] handle_action discard: {:?}", action);
-            }
             self.discard_denylist_edit(ctx);
         }
         match action {
@@ -620,6 +615,7 @@ impl SettingsPageMeta for WarpifyPageView {
     }
 
     fn clear_highlighted_widget(&mut self) {
+        self.pending_edit_ssh_host_index = None;
         self.page.clear_highlighted_widget();
     }
 }
