@@ -300,6 +300,7 @@ impl WarpifyPageView {
             SubmittableTextInputEvent::Submit(new_command) => {
                 let edit_index = self.pending_edit_ssh_host_index.take();
                 let host = new_command.trim().to_string();
+                log::info!("[DBG] Submit: host={:?}, edit_index={:?}", host, edit_index);
                 if host.is_empty() {
                     return;
                 }
@@ -321,6 +322,7 @@ impl WarpifyPageView {
                 ctx.notify();
             }
             SubmittableTextInputEvent::Escape => {
+                log::info!("[DBG] Escape handler, pending before take={:?}", self.pending_edit_ssh_host_index);
                 let edit_idx = self.pending_edit_ssh_host_index.take();
                 if let Some(original) = edit_idx.and_then(|idx| {
                     WarpifySettings::as_ref(ctx).ssh_hosts_denylist.get(idx).cloned()
@@ -492,6 +494,9 @@ impl TypedActionView for WarpifyPageView {
         use WarpifyPageAction::*;
         // Any action other than starting an edit cancels the in-progress edit.
         if !matches!(action, EditDenylistedSshHost(_)) {
+            if self.pending_edit_ssh_host_index.is_some() {
+                log::info!("[DBG] handle_action {:?} -> discard_denylist_edit", action);
+            }
             self.discard_denylist_edit(ctx);
         }
         match action {
@@ -549,6 +554,7 @@ impl TypedActionView for WarpifyPageView {
                 self.remove_denylisted_ssh_host(*index, ctx);
             }
             WarpifyPageAction::EditDenylistedSshHost(index) => {
+                log::info!("[DBG] EditDenylistedSshHost({})", index);
                 let host = WarpifySettings::as_ref(ctx)
                     .ssh_hosts_denylist
                     .get(*index)
