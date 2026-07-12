@@ -321,7 +321,16 @@ impl WarpifyPageView {
                 ctx.notify();
             }
             SubmittableTextInputEvent::Escape => {
-                self.discard_denylist_edit(ctx);
+                let edit_idx = self.pending_edit_ssh_host_index.take();
+                if let Some(original) = edit_idx.and_then(|idx| {
+                    WarpifySettings::as_ref(ctx).ssh_hosts_denylist.get(idx).cloned()
+                }) {
+                    self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
+                        editor.editor().update(ctx, |e, ctx| {
+                            e.system_reset_buffer_text(&original, ctx);
+                        });
+                    });
+                }
                 ctx.emit(SettingsPageEvent::FocusModal);
             }
         }
@@ -367,20 +376,10 @@ fn build_sub_sub_title(title: String, appearance: &Appearance) -> Container {
 const SSH_EXTENSION_DROPDOWN_WIDTH: f32 = 250.;
 
 impl WarpifyPageView {
-    /// Discards any in-progress denylist edit: restores the original host text
-    /// and exits edit mode. Called when the user interacts with other controls.
-    fn discard_denylist_edit(&mut self, ctx: &mut ViewContext<Self>) {
-        if let Some(idx) = self.pending_edit_ssh_host_index.take() {
-            if let Some(original) = WarpifySettings::as_ref(ctx)
-                .ssh_hosts_denylist.get(idx).cloned()
-            {
-                self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
-                    editor.editor().update(ctx, |e, ctx| {
-                        e.system_reset_buffer_text(&original, ctx);
-                    });
-                });
-            }
-        }
+    /// Discards any in-progress denylist edit: exits edit mode.
+    /// The editor text is NOT restored — the list still shows the original entry.
+    fn discard_denylist_edit(&mut self, _ctx: &mut ViewContext<Self>) {
+        self.pending_edit_ssh_host_index = None;
     }
 
     fn create_ssh_extension_install_mode_dropdown(
