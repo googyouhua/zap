@@ -8770,6 +8770,7 @@ impl View for EditorView {
     }
 
     fn on_blur(&mut self, blur_ctx: &BlurContext, ctx: &mut ViewContext<Self>) {
+        log::info!("[DENYLIST_DEBUG] EditorView::on_blur called, is_self_blurred={}", blur_ctx.is_self_blurred());
         if blur_ctx.is_self_blurred() {
             self.focused = false;
             self.cursors_visible = false;

@@ -321,6 +321,8 @@ impl WarpifyPageView {
                 ctx.notify();
             }
             SubmittableTextInputEvent::Escape => {
+                log::info!("[DENYLIST_DEBUG] WarpifyPageView received Escape, pending={:?}",
+                    self.pending_edit_ssh_host_index);
                 let edit_idx = self.pending_edit_ssh_host_index.take();
                 let original = edit_idx.and_then(|idx| {
                     WarpifySettings::as_ref(ctx).ssh_hosts_denylist.get(idx).cloned()
