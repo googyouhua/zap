@@ -388,9 +388,14 @@ fn build_sub_sub_title(title: String, appearance: &Appearance) -> Container {
 const SSH_EXTENSION_DROPDOWN_WIDTH: f32 = 250.;
 
 impl WarpifyPageView {
-    /// Discards any in-progress denylist edit: just clears the edit state.
-    fn discard_denylist_edit(&mut self, _ctx: &mut ViewContext<Self>) {
+    /// Discards any in-progress denylist edit: clears edit state and editor buffer.
+    fn discard_denylist_edit(&mut self, ctx: &mut ViewContext<Self>) {
         self.pending_edit_ssh_host_index = None;
+        self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
+            editor.editor().update(ctx, |e, ctx| {
+                e.clear_buffer(ctx);
+            });
+        });
     }
 
     /// Fired when the editor's inner EditorView loses focus (clicking other inputs, dropdown, etc.).
