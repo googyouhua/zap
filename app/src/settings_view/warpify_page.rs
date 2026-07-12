@@ -597,6 +597,7 @@ impl TypedActionView for WarpifyPageView {
                     });
                     ctx.focus(&self.add_denylisted_ssh_editor);
                     self.pending_edit_ssh_host_index = Some(*index);
+                    ctx.notify();
                 }
             }
             OpenUrl(url) => {
