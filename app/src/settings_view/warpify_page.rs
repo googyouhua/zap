@@ -321,7 +321,17 @@ impl WarpifyPageView {
                 ctx.notify();
             }
             SubmittableTextInputEvent::Escape => {
-                self.pending_edit_ssh_host_index = None;
+                let edit_idx = self.pending_edit_ssh_host_index.take();
+                let original = edit_idx.and_then(|idx| {
+                    WarpifySettings::as_ref(ctx).ssh_hosts_denylist.get(idx).cloned()
+                });
+                if let Some(host) = original {
+                    self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
+                        editor.editor().update(ctx, |e, ctx| {
+                            e.system_reset_buffer_text(&host, ctx);
+                        });
+                    });
+                }
                 ctx.emit(SettingsPageEvent::FocusModal);
             }
         }
