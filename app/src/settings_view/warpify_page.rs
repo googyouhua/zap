@@ -321,19 +321,7 @@ impl WarpifyPageView {
                 ctx.notify();
             }
             SubmittableTextInputEvent::Escape => {
-                log::info!("[DENYLIST_DEBUG] WarpifyPageView received Escape, pending={:?}",
-                    self.pending_edit_ssh_host_index);
-                let edit_idx = self.pending_edit_ssh_host_index.take();
-                let original = edit_idx.and_then(|idx| {
-                    WarpifySettings::as_ref(ctx).ssh_hosts_denylist.get(idx).cloned()
-                });
-                if let Some(host) = original {
-                    self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
-                        editor.editor().update(ctx, |e, ctx| {
-                            e.system_reset_buffer_text(&host, ctx);
-                        });
-                    });
-                }
+                self.discard_denylist_edit(ctx);
                 ctx.emit(SettingsPageEvent::FocusModal);
             }
         }
@@ -379,6 +367,22 @@ fn build_sub_sub_title(title: String, appearance: &Appearance) -> Container {
 const SSH_EXTENSION_DROPDOWN_WIDTH: f32 = 250.;
 
 impl WarpifyPageView {
+    /// Discards any in-progress denylist edit: restores the original host text
+    /// and exits edit mode. Called when the user interacts with other controls.
+    fn discard_denylist_edit(&mut self, ctx: &mut ViewContext<Self>) {
+        if let Some(idx) = self.pending_edit_ssh_host_index.take() {
+            if let Some(original) = WarpifySettings::as_ref(ctx)
+                .ssh_hosts_denylist.get(idx).cloned()
+            {
+                self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
+                    editor.editor().update(ctx, |e, ctx| {
+                        e.system_reset_buffer_text(&original, ctx);
+                    });
+                });
+            }
+        }
+    }
+
     fn create_ssh_extension_install_mode_dropdown(
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<Dropdown<WarpifyPageAction>> {
@@ -487,6 +491,10 @@ impl TypedActionView for WarpifyPageView {
 
     fn handle_action(&mut self, action: &Self::Action, ctx: &mut ViewContext<Self>) {
         use WarpifyPageAction::*;
+        // Any action other than starting an edit cancels the in-progress edit.
+        if !matches!(action, EditDenylistedSshHost(_)) {
+            self.discard_denylist_edit(ctx);
+        }
         match action {
             RemoveDenylistedCommand(index) => self.remove_denylisted_command(*index, ctx),
             RemoveAddedCommand(index) => self.remove_added_command(*index, ctx),

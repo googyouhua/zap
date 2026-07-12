@@ -116,15 +116,9 @@ impl SubmittableTextInput {
                 };
                 ctx.notify();
             }
-            EditorEvent::Escape => {
-                log::info!("[DENYLIST_DEBUG] SubmittableTextInput received Escape");
-                ctx.emit(SubmittableTextInputEvent::Escape);
-            }
+            EditorEvent::Escape => ctx.emit(SubmittableTextInputEvent::Escape),
             // Clicking outside the input cancels the edit (emits Escape).
-            EditorEvent::Blurred => {
-                log::info!("[DENYLIST_DEBUG] EditorEvent::Blurred fired");
-                ctx.emit(SubmittableTextInputEvent::Escape);
-            }
+            EditorEvent::Blurred => ctx.emit(SubmittableTextInputEvent::Escape),
             _ => {}
         }
     }
