@@ -388,6 +388,7 @@ const SSH_EXTENSION_DROPDOWN_WIDTH: f32 = 250.;
 impl WarpifyPageView {
     /// Discards any in-progress denylist edit: just clears the edit state.
     fn discard_denylist_edit(&mut self, _ctx: &mut ViewContext<Self>) {
+        log::info!("[DENYLIST] discard_denylist_edit, was={:?}", self.pending_edit_ssh_host_index);
         self.pending_edit_ssh_host_index = None;
     }
 
@@ -399,6 +400,7 @@ impl WarpifyPageView {
         ctx: &mut ViewContext<Self>,
     ) {
         if matches!(event, EditorEvent::Blurred) {
+            log::info!("[DENYLIST] Blur handler fired, pending={:?}", self.pending_edit_ssh_host_index);
             self.discard_denylist_edit(ctx);
         }
     }
@@ -513,6 +515,7 @@ impl TypedActionView for WarpifyPageView {
         use WarpifyPageAction::*;
         // Any action other than starting an edit cancels the in-progress edit.
         if !matches!(action, EditDenylistedSshHost(_)) {
+            log::info!("[DENYLIST] handle_action {:?} guard, pending={:?}", action, self.pending_edit_ssh_host_index);
             self.discard_denylist_edit(ctx);
         }
         match action {
@@ -570,6 +573,7 @@ impl TypedActionView for WarpifyPageView {
                 self.remove_denylisted_ssh_host(*index, ctx);
             }
             WarpifyPageAction::EditDenylistedSshHost(index) => {
+                log::info!("[DENYLIST] Edit({}), pending_before={:?}", index, self.pending_edit_ssh_host_index);
                 let host = WarpifySettings::as_ref(ctx)
                     .ssh_hosts_denylist
                     .get(*index)
@@ -582,7 +586,11 @@ impl TypedActionView for WarpifyPageView {
                     });
                     ctx.focus(&self.add_denylisted_ssh_editor);
                     self.pending_edit_ssh_host_index = Some(*index);
+                    log::info!("[DENYLIST] Edit({}) -> index set={:?}, pending after set={:?}",
+                        index, Some(*index), self.pending_edit_ssh_host_index);
                     ctx.notify();
+                    log::info!("[DENYLIST] Edit({}) -> after notify, pending={:?}",
+                        index, self.pending_edit_ssh_host_index);
                 }
             }
             OpenUrl(url) => {
