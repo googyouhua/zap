@@ -10,7 +10,10 @@ use warp_core::features::FeatureFlag;
 use warpui::elements::{FormattedTextElement, HighlightedHyperlink};
 use warpui::keymap::ContextPredicate;
 use warpui::{
-    elements::{Container, Flex, MouseStateHandle, ParentElement},
+    elements::{
+        Align, Container, CornerRadius, CrossAxisAlignment, Fill, Flex, Hoverable,
+        MouseStateHandle, ParentElement, Radius, Shrinkable,
+    },
     presenter::ChildView,
     ui_components::{
         components::{Coords, UiComponent, UiComponentStyles},
@@ -25,6 +28,7 @@ use crate::terminal::warpify::settings::{
     UseSshTmuxWrapper, WarpifySettingsChangedEvent,
 };
 use crate::ui_components::blended_colors;
+
 use crate::{
     appearance::Appearance,
     report_if_error, send_telemetry_from_ctx,
@@ -39,6 +43,8 @@ use super::settings_page::{
     HEADER_PADDING,
 };
 use super::SettingsSection;
+use warp_core::ui::theme::color::internal_colors;
+use warpui::color::ColorU;
 use super::{
     flags,
     settings_page::{
@@ -90,7 +96,10 @@ pub struct WarpifyPageView {
     add_denylisted_commands_editor: ViewHandle<SubmittableTextInput>,
 
     remove_denylisted_ssh_button_states: Vec<MouseStateHandle>,
+    edit_denylisted_ssh_button_states: Vec<MouseStateHandle>,
     add_denylisted_ssh_editor: ViewHandle<SubmittableTextInput>,
+
+    pending_edit_ssh_host_index: Option<usize>,
 
     ssh_extension_install_mode_dropdown: ViewHandle<Dropdown<WarpifyPageAction>>,
 }
@@ -157,7 +166,9 @@ impl WarpifyPageView {
             remove_denylisted_command_button_states: Default::default(),
             add_denylisted_commands_editor,
             remove_denylisted_ssh_button_states: Default::default(),
+            edit_denylisted_ssh_button_states: Default::default(),
             add_denylisted_ssh_editor,
+            pending_edit_ssh_host_index: None,
             ssh_extension_install_mode_dropdown,
         };
 
@@ -215,6 +226,11 @@ impl WarpifyPageView {
             .map(|_| Default::default())
             .collect();
         self.remove_denylisted_ssh_button_states = warpify_settings
+            .ssh_hosts_denylist
+            .iter()
+            .map(|_| Default::default())
+            .collect();
+        self.edit_denylisted_ssh_button_states = warpify_settings
             .ssh_hosts_denylist
             .iter()
             .map(|_| Default::default())
@@ -282,13 +298,32 @@ impl WarpifyPageView {
     ) {
         match event {
             SubmittableTextInputEvent::Submit(new_command) => {
+                let edit_index = self.pending_edit_ssh_host_index.take();
+                let host = new_command.trim().to_string();
+                if host.is_empty() {
+                    return;
+                }
                 WarpifySettings::handle(ctx).update(ctx, |warpify_settings, ctx| {
-                    warpify_settings.denylist_ssh_host(new_command, ctx);
+                    if let Some(idx) = edit_index {
+                        let mut new_list = warpify_settings.ssh_hosts_denylist.to_vec();
+                        if idx < new_list.len() {
+                            new_list[idx] = host;
+                        }
+                        warpify_settings.ssh_hosts_denylist
+                            .set_value(new_list, ctx)
+                            .expect("ssh_hosts_denylist failed to serialize");
+                    } else {
+                        warpify_settings.denylist_ssh_host(&host, ctx);
+                    }
                 });
 
                 send_telemetry_from_ctx!(TelemetryEvent::AddDenylistedSshTmuxWrapperHost, ctx);
+                ctx.notify();
             }
-            SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
+            SubmittableTextInputEvent::Escape => {
+                self.pending_edit_ssh_host_index = None;
+                ctx.emit(SettingsPageEvent::FocusModal);
+            }
         }
     }
 
@@ -426,6 +461,7 @@ pub enum WarpifyPageAction {
     RemoveAddedCommand(usize),
     RemoveDenylistedCommand(usize),
     RemoveDenylistedSshHost(usize),
+    EditDenylistedSshHost(usize),
     /// If disabled, auto-Warpification and the SSH Warpification prompt will be disabled.
     ToggleTmuxWarpification,
     ToggleSshWarpification,
@@ -492,6 +528,20 @@ impl TypedActionView for WarpifyPageView {
             }
             WarpifyPageAction::RemoveDenylistedSshHost(index) => {
                 self.remove_denylisted_ssh_host(*index, ctx);
+            }
+            WarpifyPageAction::EditDenylistedSshHost(index) => {
+                let host = WarpifySettings::as_ref(ctx)
+                    .ssh_hosts_denylist
+                    .get(*index)
+                    .cloned();
+                if let Some(host) = host {
+                    self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
+                        editor.editor().update(ctx, |e, ctx| {
+                            e.system_reset_buffer_text(&host, ctx);
+                        });
+                    });
+                    self.pending_edit_ssh_host_index = Some(*index);
+                }
             }
             OpenUrl(url) => {
                 ctx.open_url(url.as_str());
@@ -805,21 +855,109 @@ impl SettingsWidget for SSHWidget {
         );
 
         if enable_ssh_warpification {
-            column.add_child(
-                view.build_input_list(
-                    crate::t!("settings-warpify-denylisted-hosts"),
-                    &WarpifySettings::as_ref(app).ssh_hosts_denylist,
-                    &view.remove_denylisted_ssh_button_states,
-                    WarpifyPageAction::RemoveDenylistedSshHost,
-                    &view.add_denylisted_ssh_editor,
-                    appearance,
-                )
-                .finish(),
+            let mut list_column = Flex::column();
+            let mut title = build_sub_sub_title(
+                crate::t!("settings-warpify-denylisted-hosts"),
+                appearance,
             );
+            if !WarpifySettings::as_ref(app).ssh_hosts_denylist.is_empty() {
+                title = title.with_padding_bottom(BUILT_IN_TEXT_INPUT_MARGIN);
+            }
+            list_column.add_child(title.finish());
+
+            let edit_index = view.pending_edit_ssh_host_index;
+            for (i, host) in WarpifySettings::as_ref(app).ssh_hosts_denylist.iter().enumerate() {
+                if edit_index == Some(i) {
+                    list_column.add_child(
+                        Container::new(ChildView::new(&view.add_denylisted_ssh_editor).finish())
+                            .finish(),
+                    );
+                } else {
+                    let background: Fill = if i % 2 == 0 {
+                        Fill::Solid(internal_colors::fg_overlay_1(appearance.theme()).into())
+                    } else {
+                        Fill::Solid(ColorU::transparent_black())
+                    };
+                    list_column.add_child(render_ssh_denylist_item(
+                        appearance,
+                        background,
+                        host,
+                        view.remove_denylisted_ssh_button_states[i].clone(),
+                        view.edit_denylisted_ssh_button_states[i].clone(),
+                        i,
+                    ));
+                }
+            }
+
+            if edit_index.is_none() {
+                list_column.add_child(
+                    Container::new(ChildView::new(&view.add_denylisted_ssh_editor).finish())
+                        .with_margin_bottom(SPACE_AFTER_TEXT_INPUT)
+                        .finish(),
+                );
+            }
+
+            column.add_child(Container::new(list_column.finish()).finish());
         }
 
         column.finish()
     }
+}
+
+const SSH_LIST_CLOSE_BUTTON_DIAMETER: f32 = 20.0;
+const SSH_LIST_ITEM_PADDING: f32 = 8.0;
+const SSH_LIST_ITEM_PADDING_BOTTOM: f32 = 10.0;
+
+fn render_ssh_denylist_item(
+    appearance: &Appearance,
+    background: impl Into<Fill>,
+    host: &str,
+    remove_mouse_state: MouseStateHandle,
+    edit_mouse_state: MouseStateHandle,
+    index: usize,
+) -> Box<dyn Element> {
+    let background = background.into();
+    let font_color = appearance.theme().foreground();
+
+    let remove_button = appearance
+        .ui_builder()
+        .close_button(SSH_LIST_CLOSE_BUTTON_DIAMETER, remove_mouse_state)
+        .build()
+        .on_click(move |ctx, _, _| ctx.dispatch_typed_action(WarpifyPageAction::RemoveDenylistedSshHost(index)))
+        .finish();
+
+    let label = Hoverable::new(edit_mouse_state, |_| {
+        appearance
+            .ui_builder()
+            .wrappable_text(host.to_string(), true)
+            .with_style(UiComponentStyles {
+                font_color: Some(font_color.into_solid()),
+                font_family_id: Some(appearance.monospace_font_family()),
+                font_size: Some(appearance.ui_font_size()),
+                ..Default::default()
+            })
+            .build()
+            .finish()
+    })
+    .on_click(move |ctx, _, _| ctx.dispatch_typed_action(WarpifyPageAction::EditDenylistedSshHost(index)))
+    .finish();
+
+    Container::new(
+        Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_children([
+                Shrinkable::new(1., Align::new(label).left().finish()).finish(),
+                Container::new(remove_button)
+                    .with_margin_left(SSH_LIST_ITEM_PADDING)
+                    .finish(),
+            ])
+            .finish(),
+    )
+    .with_background(background)
+    .with_uniform_padding(SSH_LIST_ITEM_PADDING)
+    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+    .with_padding_bottom(SSH_LIST_ITEM_PADDING_BOTTOM)
+    .finish()
 }
 
 mod styles {

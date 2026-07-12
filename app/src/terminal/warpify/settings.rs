@@ -5,6 +5,7 @@ use settings::{
     macros::{maybe_define_setting, register_settings_events},
     ChangeEventReason, RespectUserSyncSetting, Setting, SupportedPlatforms, SyncToCloud,
 };
+use std::io::Write;
 use strum_macros::EnumIter;
 use warp_util::path::ShellFamily;
 use warpui::{AppContext, ModelContext};
@@ -276,7 +277,8 @@ impl WarpifySettings {
                 }
                 WarpifySettingsChangedEvent::SshHostsDenylist { .. } => {
                     me.parsed_ssh_hosts_denylist =
-                        Self::parse_ssh_hosts_denylist(&me.ssh_hosts_denylist)
+                        Self::parse_ssh_hosts_denylist(&me.ssh_hosts_denylist);
+                    Self::write_denylist_file(&me.ssh_hosts_denylist);
                 }
                 WarpifySettingsChangedEvent::EnableSshWarpification { .. } => {}
                 WarpifySettingsChangedEvent::UseSshTmuxWrapper { .. } => {}
@@ -416,10 +418,11 @@ impl WarpifySettings {
     /// This function determines if we should ask the user whether they want to bootstrap an ssh session.
     /// It determines this by matching the host against a denylist of hosts, which can include regex.
     pub fn is_ssh_host_denylisted(&self, ssh_host: &str) -> bool {
+        let ssh_host = ssh_host.trim();
         self.parsed_ssh_hosts_denylist
             .iter()
             .flatten()
-            .any(|regex| regex.is_match(ssh_host.trim()))
+            .any(|regex| regex.is_match(ssh_host))
     }
 
     fn parse_added_subshell_commands(
@@ -445,7 +448,13 @@ impl WarpifySettings {
     ) -> Vec<Result<Regex, regex::Error>> {
         ssh_hosts_denylist
             .iter()
-            .map(|user_pattern| Regex::new(user_pattern))
+            .flat_map(|user_pattern| {
+                user_pattern
+                    .split(';')
+                    .map(|part| part.trim())
+                    .filter(|part| !part.is_empty())
+                    .map(|part| Regex::new(part))
+            })
             .collect()
     }
 
@@ -470,6 +479,7 @@ impl WarpifySettings {
     pub fn denylist_ssh_host(&mut self, host_to_denylist: &str, ctx: &mut ModelContext<Self>) {
         let mut new_denylist = self.ssh_hosts_denylist.to_vec();
         new_denylist.push(host_to_denylist.trim().to_owned());
+        Self::write_denylist_file(&new_denylist);
         self.ssh_hosts_denylist
             .set_value(new_denylist, ctx)
             .expect("ssh_hosts_denylist failed to serialize");
@@ -523,9 +533,20 @@ impl WarpifySettings {
         ctx.notify();
     }
 
+    /// Writes the SSH host denylist to a temp file so that running shells can
+    /// read it dynamically (WARP_SSH_DENY_HOSTS env var is only set at PTY creation).
+    fn write_denylist_file(denylist: &[String]) {
+        if let Ok(mut file) = std::fs::File::create("/tmp/warp-ssh-deny-hosts") {
+            for host in denylist {
+                let _ = writeln!(file, "{host}");
+            }
+        }
+    }
+
     pub fn remove_denylisted_ssh_host(&mut self, index: usize, ctx: &mut ModelContext<Self>) {
         let mut new_denylist = self.ssh_hosts_denylist.to_vec();
         new_denylist.remove(index);
+        Self::write_denylist_file(&new_denylist);
         self.ssh_hosts_denylist
             .set_value(new_denylist, ctx)
             .expect("ssh_hosts_denylist failed to serialize");
