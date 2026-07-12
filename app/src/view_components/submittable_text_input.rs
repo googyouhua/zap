@@ -117,8 +117,6 @@ impl SubmittableTextInput {
                 ctx.notify();
             }
             EditorEvent::Escape => ctx.emit(SubmittableTextInputEvent::Escape),
-            // Clicking outside the input cancels the edit (emits Escape).
-            EditorEvent::Blurred => ctx.emit(SubmittableTextInputEvent::Escape),
             _ => {}
         }
     }
