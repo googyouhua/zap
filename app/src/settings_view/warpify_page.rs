@@ -394,6 +394,7 @@ impl WarpifyPageView {
     /// Discards any in-progress denylist edit: clears state and editor buffer.
     fn discard_denylist_edit(&mut self, ctx: &mut ViewContext<Self>) {
         self.pending_edit_ssh_host_index = None;
+        self.suppress_denylist_blur = false;
         self.add_denylisted_ssh_editor.update(ctx, |editor, ctx| {
             editor.editor().update(ctx, |e, ctx| {
                 e.clear_buffer(ctx);
@@ -412,6 +413,7 @@ impl WarpifyPageView {
                 self.suppress_denylist_blur = false;
                 return;
             }
+            self.suppress_denylist_blur = false;
             self.discard_denylist_edit(ctx);
         }
     }
