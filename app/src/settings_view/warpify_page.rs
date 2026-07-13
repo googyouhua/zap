@@ -31,6 +31,7 @@ use crate::ui_components::blended_colors;
 
 use crate::{
     appearance::Appearance,
+    editor::{Event as EditorEvent, EditorView},
     report_if_error, send_telemetry_from_ctx,
     server::telemetry::TelemetryEvent,
     terminal::warpify::settings::WarpifySettings,
@@ -101,6 +102,10 @@ pub struct WarpifyPageView {
 
     pending_edit_ssh_host_index: Option<usize>,
 
+    /// Skips the next EditorView::Blurred event (set after EditDenylistedSshHost to
+    /// prevent the re-render from immediately cancelling the edit).
+    suppress_denylist_blur: bool,
+
     ssh_extension_install_mode_dropdown: ViewHandle<Dropdown<WarpifyPageAction>>,
 }
 
@@ -156,6 +161,15 @@ impl WarpifyPageView {
             Self::handle_denylisted_ssh_editor_event,
         );
 
+        // Subscribe to the inner EditorView's Blurred to discard edit when clicking other inputs.
+        let deny_ssh_editor_handle = add_denylisted_ssh_editor.read(ctx, |editor, _| {
+            editor.editor().clone()
+        });
+        ctx.subscribe_to_view(
+            &deny_ssh_editor_handle,
+            Self::handle_denylisted_ssh_blur,
+        );
+
         let ssh_extension_install_mode_dropdown =
             Self::create_ssh_extension_install_mode_dropdown(ctx);
 
@@ -169,6 +183,7 @@ impl WarpifyPageView {
             edit_denylisted_ssh_button_states: Default::default(),
             add_denylisted_ssh_editor,
             pending_edit_ssh_host_index: None,
+            suppress_denylist_blur: false,
             ssh_extension_install_mode_dropdown,
         };
 
@@ -386,6 +401,21 @@ impl WarpifyPageView {
         });
     }
 
+    fn handle_denylisted_ssh_blur(
+        &mut self,
+        _handle: ViewHandle<EditorView>,
+        event: &EditorEvent,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if matches!(event, EditorEvent::Blurred) {
+            if self.suppress_denylist_blur {
+                self.suppress_denylist_blur = false;
+                return;
+            }
+            self.discard_denylist_edit(ctx);
+        }
+    }
+
     fn create_ssh_extension_install_mode_dropdown(
         ctx: &mut ViewContext<Self>,
     ) -> ViewHandle<Dropdown<WarpifyPageAction>> {
@@ -565,6 +595,7 @@ impl TypedActionView for WarpifyPageView {
                     });
                     ctx.focus(&self.add_denylisted_ssh_editor);
                     self.pending_edit_ssh_host_index = Some(*index);
+                    self.suppress_denylist_blur = true;
                     ctx.notify();
                 }
             }
