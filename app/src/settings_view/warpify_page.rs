@@ -137,7 +137,8 @@ impl WarpifyPageView {
         );
 
         let add_denylisted_ssh_editor = ctx.add_typed_action_view(|ctx| {
-            let mut input = SubmittableTextInput::new(ctx);
+            let mut input = SubmittableTextInput::new(ctx)
+                .discard_on_blur(true);
             input.set_placeholder_text(crate::t!("settings-warpify-host-placeholder"), ctx);
             input
         });
@@ -253,6 +254,7 @@ impl WarpifyPageView {
                 send_telemetry_from_ctx!(TelemetryEvent::AddAddedSubshellCommand, ctx);
             }
             SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
+            SubmittableTextInputEvent::Blurred => {}
         }
     }
 
@@ -271,6 +273,7 @@ impl WarpifyPageView {
                 send_telemetry_from_ctx!(TelemetryEvent::AddDenylistedSubshellCommand, ctx);
             }
             SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
+            SubmittableTextInputEvent::Blurred => {}
         }
     }
 
@@ -289,6 +292,7 @@ impl WarpifyPageView {
                 send_telemetry_from_ctx!(TelemetryEvent::AddDenylistedSshTmuxWrapperHost, ctx);
             }
             SubmittableTextInputEvent::Escape => ctx.emit(SettingsPageEvent::FocusModal),
+            SubmittableTextInputEvent::Blurred => {}
         }
     }
 

@@ -687,6 +687,7 @@ impl AISettingsPageView {
                     });
                 }
                 SubmittableTextInputEvent::Escape => ctx.emit(AISettingsPageEvent::FocusModal),
+                SubmittableTextInputEvent::Blurred => {},
             },
         );
 

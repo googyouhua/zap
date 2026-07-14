@@ -36,6 +36,8 @@ pub struct SubmittableTextInput {
     submit_button_state: MouseStateHandle,
     outer_margin_top: f32,
     outer_margin_bottom: f32,
+    /// Whether to discard input when the editor loses focus.
+    discard_on_blur: bool,
 }
 
 impl SubmittableTextInput {
@@ -61,6 +63,7 @@ impl SubmittableTextInput {
             submit_button_state: Default::default(),
             outer_margin_top: 10.,
             outer_margin_bottom: 10.,
+            discard_on_blur: false,
         }
     }
 
@@ -77,6 +80,13 @@ impl SubmittableTextInput {
     pub fn validate_on_submit<F: Fn(&str) -> bool + 'static>(mut self, validator: F) -> Self {
         self.validator_type = ValidatorType::OnSubmitOnly;
         self.validator = Box::new(validator);
+        self
+    }
+
+    /// When the inner editor loses focus, clear the buffer and emit
+    /// [`SubmittableTextInputEvent::Blurred`].
+    pub fn discard_on_blur(mut self, discard: bool) -> Self {
+        self.discard_on_blur = discard;
         self
     }
 
@@ -117,6 +127,12 @@ impl SubmittableTextInput {
                 ctx.notify();
             }
             EditorEvent::Escape => ctx.emit(SubmittableTextInputEvent::Escape),
+            EditorEvent::Blurred => {
+                if self.discard_on_blur {
+                    self.editor.update(ctx, |editor, ctx| editor.clear_buffer(ctx));
+                }
+                ctx.emit(SubmittableTextInputEvent::Blurred);
+            }
             _ => {}
         }
     }
@@ -220,6 +236,8 @@ pub enum SubmittableTextInputEvent {
     /// Notify the subscribers (parent view) of the submission.
     Submit(String),
     Escape,
+    /// The inner editor lost focus.
+    Blurred,
 }
 
 impl Entity for SubmittableTextInput {
