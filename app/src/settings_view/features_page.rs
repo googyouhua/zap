@@ -722,9 +722,10 @@ lazy_static! {
         key: "tab".to_string(),
         ..Default::default()
     };
-    static ref CTRL_SPACE_KEYSTROKE: Keystroke = Keystroke {
-        key: " ".into(),
+    static ref CTRL_ALT_A_KEYSTROKE: Keystroke = Keystroke {
+        key: "a".into(),
         ctrl: true,
+        alt: true,
         ..Default::default()
     };
 }
@@ -3327,7 +3328,7 @@ impl FeaturesPageView {
                 if *self.completions_keystroke == TAB_KEYSTROKE_STR {
                     set_custom_keybinding(
                         OPEN_COMPLETIONS_KEYBINDING_NAME,
-                        &CTRL_SPACE_KEYSTROKE,
+                        &CTRL_ALT_A_KEYSTROKE,
                         ctx,
                     );
                 }

@@ -45,7 +45,51 @@ fn main() -> Result<()> {
     }
     ChannelState::set(state);
 
+    #[cfg(target_os = "linux")]
+    setup_linux_ime();
+
     warp::run()
+}
+
+/// 自动检测 Linux 上正在运行的输入法框架，设置对应的环境变量。
+/// 三个变量各自独立检测：已由桌面环境配置的不会被覆盖。
+#[cfg(target_os = "linux")]
+fn setup_linux_ime() {
+    use std::process::Command;
+
+    if std::env::var("XMODIFIERS").is_ok()
+        && std::env::var("GTK_IM_MODULE").is_ok()
+        && std::env::var("QT_IM_MODULE").is_ok()
+    {
+        return;
+    }
+
+    let candidates: &[(&str, &str, &str, &str)] = &[
+        ("fcitx5", "fcitx5", "fcitx", "fcitx"),
+        ("fcitx", "fcitx", "fcitx", "fcitx"),
+        ("ibus-daemon", "ibus", "ibus", "ibus"),
+    ];
+
+    let im = candidates.iter().find(|(process, _, _, _)| {
+        Command::new("pgrep")
+            .arg("-x")
+            .arg(process)
+            .output()
+            .ok()
+            .is_some_and(|o| o.status.success())
+    });
+
+    if let Some(&(_, xim_mod, gtk_mod, qt_mod)) = im {
+        if std::env::var("XMODIFIERS").is_err() {
+            std::env::set_var("XMODIFIERS", format!("@im={xim_mod}"));
+        }
+        if std::env::var("GTK_IM_MODULE").is_err() {
+            std::env::set_var("GTK_IM_MODULE", gtk_mod);
+        }
+        if std::env::var("QT_IM_MODULE").is_err() {
+            std::env::set_var("QT_IM_MODULE", qt_mod);
+        }
+    }
 }
 
 // If we're not using an external plist, embed the following as the Info.plist.

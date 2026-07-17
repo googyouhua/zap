@@ -474,7 +474,8 @@ fn keystroke_to_c0_control_code(
 ) -> Option<Vec<u8>> {
     lazy_static! {
         static ref KEYSTROKE_TO_C0_CODE: HashMap<&'static str, u8> = HashMap::from([
-            (" ", C0::NUL),
+            // 注意: Ctrl+Space 被排除在 C0 映射之外，以允许 IME（如 fcitx）拦截此按键
+            // 用于输入法切换。Ctrl+2 仍可产生 NUL (^@) 作为替代。
             ("2", C0::NUL),
             ("3", C0::ESC),
             ("4", C0::FS),
