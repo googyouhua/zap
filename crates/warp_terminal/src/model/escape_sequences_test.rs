@@ -45,8 +45,18 @@ fn validate_mouse_test_cases<T: ModeProvider>(
 fn test_keystroke_to_c0_control_code() {
     // Expected mapping taken from the VT220 spec
     // [here](https://vt100.net/docs/vt220-rm/chapter3.html#S3.2.5), table 3.2.5.
+    let terminal_model_mock = TerminalModelMock::new();
+
+    // Ctrl+Space 不映射到 C0，以允许 IME 拦截（fcitx/ibus 输入法切换）
+    let ctrl_space_result = KeystrokeWithDetails {
+        keystroke: &Keystroke::parse("ctrl- ").unwrap(),
+        key_without_modifiers: None,
+        chars: None,
+    }
+    .to_escape_sequence(&terminal_model_mock);
+    assert_eq!(None, ctrl_space_result, "Ctrl+Space should not be consumed by C0 mapping");
+
     let test_cases: &[(Keystroke, Vec<u8>)] = &[
-        (Keystroke::parse("ctrl- ").unwrap(), vec![C0::NUL]),
         (Keystroke::parse("ctrl-2").unwrap(), vec![C0::NUL]),
         (Keystroke::parse("ctrl-3").unwrap(), vec![C0::ESC]),
         (Keystroke::parse("ctrl-4").unwrap(), vec![C0::FS]),
@@ -56,7 +66,6 @@ fn test_keystroke_to_c0_control_code() {
         (Keystroke::parse("ctrl-8").unwrap(), vec![C0::DEL]),
     ];
 
-    let terminal_model_mock = TerminalModelMock::new();
     validate_keystroke_test_cases(test_cases, &terminal_model_mock);
 }
 

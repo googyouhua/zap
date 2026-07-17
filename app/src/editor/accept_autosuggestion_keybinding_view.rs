@@ -41,9 +41,10 @@ lazy_static! {
         key: "tab".to_string(),
         ..Default::default()
     };
-    static ref CTRL_SPACE_KEYSTROKE: Keystroke = Keystroke {
-        key: " ".into(),
+    static ref CTRL_ALT_A_KEYSTROKE: Keystroke = Keystroke {
+        key: "a".into(),
         ctrl: true,
+        alt: true,
         ..Default::default()
     };
 }
@@ -208,12 +209,12 @@ impl TypedActionView for AcceptAutosuggestionKeybinding {
                 {
                     set_custom_keybinding(
                         OPEN_COMPLETIONS_KEYBINDING_NAME,
-                        &CTRL_SPACE_KEYSTROKE,
+                        &CTRL_ALT_A_KEYSTROKE,
                         ctx,
                     );
                 } else if *keystroke != *TAB_KEYSTROKE
                     && open_completions_keystroke
-                        .is_some_and(|keystroke| keystroke == *CTRL_SPACE_KEYSTROKE)
+                        .is_some_and(|keystroke| keystroke == *CTRL_ALT_A_KEYSTROKE)
                 {
                     // If we're setting accept autosuggestion to anything other than tab, switch open completions back to tab if it was set to ctrl-space above.
                     // Note that we can't tell if the user explicitly set it to ctrl-space vs we did it as a default above.
