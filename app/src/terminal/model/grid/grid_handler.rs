@@ -639,6 +639,13 @@ impl GridHandler {
                 break;
             }
 
+            // Skip empty cells — they represent unwritten grid space (e.g. at the end
+            // of a WRAPLINE row) and would cause the UrlLocator to reset prematurely.
+            if item.cell().c == DEFAULT_CHAR {
+                cursor.move_backward();
+                continue;
+            }
+
             // Otherwise, if we've scanned behind the hovered point more than the max character
             // limit, we know scanning forward from there won't yield a URL
             if total_characters_scanned > URL_SCAN_CHARACTER_MAX_COUNT {
@@ -664,6 +671,13 @@ impl GridHandler {
 
         total_characters_scanned = 0;
         while let Some(item) = cursor.current_item() {
+            // Skip empty cells — they represent unwritten grid space (e.g. at the end
+            // of a WRAPLINE row) and would cause the UrlLocator to reset prematurely.
+            if item.cell().c == DEFAULT_CHAR {
+                cursor.move_forward();
+                continue;
+            }
+
             // If we maxed out the number of characters we're willing to scan, then one of
             // two scenarios happened:
             // 1. The URL is exactly of length URL_SCAN_CHARACTER_MAX_COUNT+1, in which case we

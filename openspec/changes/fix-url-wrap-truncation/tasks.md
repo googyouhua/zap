@@ -1,0 +1,4 @@
+- [x] Investigate root cause of wrapped URL truncation
+- [x] Skip DEFAULT_CHAR cells in `url_at_point` forward scan
+- [x] Skip DEFAULT_CHAR cells in `url_at_point` backward scan
+- [x] Run `cargo check` and URL-related tests
