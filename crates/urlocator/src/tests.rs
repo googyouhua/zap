@@ -172,10 +172,13 @@ fn cjk_punctuation_excluded_from_url() {
     assert_eq!(max_len("https://example.org。"), Some(19));
     assert_eq!(max_len("https://example.org、"), Some(19));
     assert_eq!(max_len("https://example.org）"), Some(19));
+    assert_eq!(max_len("https://example.org，"), Some(19));
     assert_eq!(max_len("https://example.org》"), Some(19));
     assert_eq!(max_len("https://example.org！"), Some(19));
     assert_eq!(max_len("https://example.org？"), Some(19));
     assert_eq!(max_len("https://example.org："), Some(19));
+    assert_eq!(max_len("https://example.org］"), Some(19));
+    assert_eq!(max_len("https://example.org｝"), Some(19));
     assert_eq!(max_len("https://example.org；"), Some(19));
     assert_eq!(max_len("https://example.org【"), Some(19));
     assert_eq!(max_len("（https://example.com）"), Some(19));
