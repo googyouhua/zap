@@ -1,0 +1,17 @@
+[package]
+name = "urlocator"
+version = "0.1.4"
+authors = ["R. Steiner <rob@edibase.ch>"]
+edition = "2021"
+license = "MIT"
+description = "Streaming URL locator"
+repository = "https://github.com/robinst/urlocator"
+
+[package.metadata.docs.rs]
+features = ["nightly"]
+
+[features]
+nightly = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("nightly"))'] }

@@ -205,7 +205,7 @@ oauth2 = { version = "5.0.0", default-features = false, features = ["reqwest"] }
 openh264 = "0.8"
 static_assertions = "1.1.0"
 url = "2.5.4"
-urlocator = "0.1.4"
+urlocator = { path = "crates/urlocator" }
 objc = "0.2"
 objc2 = "0.6.3"
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSScreen", "objc2-core-foundation"] }
