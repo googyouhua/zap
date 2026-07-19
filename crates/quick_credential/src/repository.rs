@@ -131,3 +131,7 @@ pub fn delete(credential_id: &str) -> Result<()> {
         Ok(())
     })
 }
+
+#[cfg(test)]
+#[path = "repository_tests.rs"]
+mod tests;

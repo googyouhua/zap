@@ -56,3 +56,25 @@ impl SyncDataSource for QuickCredentialDataSource {
             .collect_vec())
     }
 }
+
+#[cfg(test)]
+pub(crate) fn filter_credentials(
+    credentials: &[warp_quick_credential::QuickCredential],
+    query_text: &str,
+) -> Vec<warp_quick_credential::QuickCredential> {
+    if query_text.is_empty() {
+        return credentials.to_vec();
+    }
+    credentials
+        .iter()
+        .filter(|c| {
+            fuzzy_match::match_indices_case_insensitive(&c.label, query_text).is_some()
+                || fuzzy_match::match_indices_case_insensitive(&c.username, query_text).is_some()
+        })
+        .cloned()
+        .collect()
+}
+
+#[cfg(test)]
+#[path = "quick_credential_data_source_tests.rs"]
+mod tests;

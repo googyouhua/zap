@@ -17,3 +17,6 @@ serde.workspace = true
 uuid.workspace = true
 warp_ssh_manager.workspace = true
 zeroize = "1.8"
+
+[dev-dependencies]
+tempfile.workspace = true

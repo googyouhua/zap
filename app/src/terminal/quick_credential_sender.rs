@@ -32,3 +32,7 @@ pub fn send_quick_credential(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "quick_credential_sender_tests.rs"]
+mod tests;
