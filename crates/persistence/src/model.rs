@@ -14,9 +14,10 @@ use super::schema::{
     generic_string_objects, ignored_suggestions, mcp_environment_variables,
     mcp_server_installations, mcp_server_panes, notebook_panes, notebooks, object_actions,
     object_metadata, object_permissions, pane_branches, pane_leaves, pane_nodes, panels,
-    project_rules, projects, server_experiments, settings_panes, ssh_nodes, ssh_onekey_credentials,
-    ssh_servers, sync_meta, tabs, team_members, team_settings, teams, terminal_panes,
-    user_profiles, welcome_panes, windows, workflow_panes, workflows, workspace_teams, workspaces,
+    project_rules, projects, quick_credentials, server_experiments, settings_panes, ssh_nodes,
+    ssh_onekey_credentials, ssh_servers, sync_meta, tabs, team_members, team_settings, teams,
+    terminal_panes, user_profiles, welcome_panes, windows, workflow_panes, workflows,
+    workspace_teams, workspaces,
 };
 
 #[derive(Insertable)]
@@ -1533,6 +1534,19 @@ pub struct NewSshServer<'a> {
     pub startup_command: Option<&'a str>,
     pub notes: Option<&'a str>,
     pub credential_id: Option<&'a str>,
+}
+
+#[derive(Identifiable, Queryable, Insertable, Clone, Debug)]
+#[diesel(table_name = quick_credentials)]
+#[diesel(primary_key(id))]
+pub struct QuickCredentialRow {
+    pub id: String,
+    pub label: String,
+    pub username: String,
+    pub send_mode: String,
+    pub notes: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 // --- Sync Meta ---------------------------------------------------------
