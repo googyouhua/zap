@@ -29,6 +29,7 @@ use ai_page::{AISettingsPageAction, AISettingsPageEvent, AISettingsPageView, AIS
 use appearance_page::{AppearancePageAction, AppearanceSettingsPageView};
 use code_page::{CodeSettingsPageAction, CodeSettingsPageEvent};
 use features_page::{FeaturesPageView, FeaturesSettingsPageEvent};
+use quick_credentials_page::QuickCredentialsPageView;
 use itertools::Itertools as _;
 use keybindings::KeybindingsView;
 use mcp_servers_page::MCPServersSettingsPageView;
@@ -81,6 +82,7 @@ pub mod mcp_servers_page;
 mod nav;
 mod network_page;
 pub mod pane_manager;
+mod quick_credentials_page;
 // Zap Wave 3-1:`platform` / `platform_page` 随 `OzCloudAPIKeys` settings 入口 +
 // Zap Inc 云端 API key 管理 UI 一同物理删。
 // Zap Wave 6-8:`referrals_page` / `show_blocks_view` 随 `ReferralsClient` /
@@ -194,6 +196,8 @@ pub enum SettingsSection {
     EditorAndCodeReview,
     /// 云同步设置页。
     CloudSync,
+    /// 快速凭证管理页。
+    QuickCredentials,
     // Zap Wave 3-1:`OzCloudAPIKeys` enum variant 随 Zap Inc API key 管理 UI
     // 一同物理删。
     // Zap Wave 7-3:`CloudEnvironments` 随 ambient-agent UI 子系统物理删。
@@ -225,6 +229,7 @@ impl Display for SettingsSection {
                 crate::t!("settings-section-editor-and-code-review")
             }
             SettingsSection::CloudSync => crate::t!("settings-section-cloud-sync"),
+            SettingsSection::QuickCredentials => "Quick Credentials".to_string(),
             // 代理设置页面。i18n key `settings-section-network` 已在 en / zh-CN / ja 三种语言中齐全。
             SettingsSection::Network => crate::t!("settings-section-network"),
             // Zap Wave 3-1:`OzCloudAPIKeys` Display arm 随 variant 一同物理删。
@@ -306,6 +311,7 @@ impl FromStr for SettingsSection {
             "Editor and Code Review" | "EditorAndCodeReview" => Ok(Self::EditorAndCodeReview),
             "Network" | "网络" => Ok(Self::Network),
             "CloudSync" | "Cloud Sync" | "云同步" => Ok(Self::CloudSync),
+            "QuickCredentials" | "Quick Credentials" | "快速凭证" => Ok(Self::QuickCredentials),
             // Zap Wave 3-1:`OzCloudAPIKeys` 随 UI 一同物理删。
             // Zap Wave 7-3:`CloudEnvironments` FromStr arm 随 variant 物理删。
             _ => Err(()),
@@ -932,6 +938,7 @@ macro_rules! update_page {
             // Issue #72: 全局 HTTP 代理设置页。
             SettingsPageViewHandle::Network(handle) => $ctx.update_view(handle, $update),
             SettingsPageViewHandle::CloudSync(handle) => $ctx.update_view(handle, $update),
+            SettingsPageViewHandle::QuickCredentials(handle) => $ctx.update_view(handle, $update),
         }
     };
 }
@@ -1048,6 +1055,10 @@ impl SettingsView {
         let cloud_sync_page_handle =
             ctx.add_typed_action_view(cloud_sync_page::CloudSyncPageView::new);
 
+        // Quick Credentials 设置页。
+        let quick_credentials_page_handle =
+            ctx.add_typed_action_view(QuickCredentialsPageView::new);
+
         let font_family = Appearance::as_ref(ctx).ui_font_family();
         let search_editor = ctx.add_typed_action_view(|ctx| {
             let options = SingleLineEditorOptions {
@@ -1098,6 +1109,7 @@ impl SettingsView {
         }
 
         settings_pages.push(SettingsPage::new(cloud_sync_page_handle));
+        settings_pages.push(SettingsPage::new(quick_credentials_page_handle));
 
         // 去中心化分支:本地模式下移除所有云端账号 / 计费 / 团队 / 同步 / 分享相关的
         // 设置入口。
@@ -1112,6 +1124,7 @@ impl SettingsView {
             SettingsNavItem::Page(SettingsSection::Keybindings),
             SettingsNavItem::Page(SettingsSection::Warpify),
             SettingsNavItem::Page(SettingsSection::CloudSync),
+            SettingsNavItem::Page(SettingsSection::QuickCredentials),
             SettingsNavItem::Page(SettingsSection::About),
         ];
 
@@ -1813,6 +1826,7 @@ impl SettingsView {
             // Issue #72: 全局 HTTP 代理设置页。
             SettingsPageViewHandle::Network(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::CloudSync(v) => v.as_ref(app).should_render(app),
+            SettingsPageViewHandle::QuickCredentials(v) => v.as_ref(app).should_render(app),
         }
     }
 

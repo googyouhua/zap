@@ -13,7 +13,7 @@ pub struct QuickCredentialDataSource {
 
 impl QuickCredentialDataSource {
     pub fn new() -> Result<Self, String> {
-        let credentials = warp_quick_credential::QuickCredentialRepository::list()?;
+        let credentials = warp_quick_credential::find_all().map_err(|e| e.to_string())?;
         Ok(Self { credentials })
     }
 }

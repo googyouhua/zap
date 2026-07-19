@@ -15,6 +15,7 @@ use super::{
     keybindings::KeybindingsView,
     mcp_servers_page::MCPServersSettingsPageView,
     network_page::NetworkPageView,
+    quick_credentials_page::QuickCredentialsPageView,
     warp_drive_page::WarpDriveSettingsPageView,
     warpify_page::WarpifyPageView,
     SettingsSection,
@@ -113,6 +114,8 @@ pub enum SettingsPageViewHandle {
     Network(ViewHandle<NetworkPageView>),
     /// 云同步设置页。
     CloudSync(ViewHandle<CloudSyncPageView>),
+    /// 快速凭证管理页。
+    QuickCredentials(ViewHandle<QuickCredentialsPageView>),
 }
 
 impl SettingsPageViewHandle {
@@ -133,6 +136,7 @@ impl SettingsPageViewHandle {
             ZapDrive(view_handle) => ChildView::new(view_handle).finish(),
             Network(view_handle) => ChildView::new(view_handle).finish(),
             CloudSync(view_handle) => ChildView::new(view_handle).finish(),
+            QuickCredentials(view_handle) => ChildView::new(view_handle).finish(),
         }
     }
 }
@@ -146,6 +150,12 @@ impl From<ViewHandle<MCPServersSettingsPageView>> for SettingsPageViewHandle {
 impl From<ViewHandle<CloudSyncPageView>> for SettingsPageViewHandle {
     fn from(view_handle: ViewHandle<CloudSyncPageView>) -> Self {
         SettingsPageViewHandle::CloudSync(view_handle)
+    }
+}
+
+impl From<ViewHandle<QuickCredentialsPageView>> for SettingsPageViewHandle {
+    fn from(view_handle: ViewHandle<QuickCredentialsPageView>) -> Self {
+        SettingsPageViewHandle::QuickCredentials(view_handle)
     }
 }
 
