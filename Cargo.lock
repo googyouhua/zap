@@ -15253,6 +15253,7 @@ dependencies = [
  "log",
  "persistence",
  "serde",
+ "tempfile",
  "uuid",
  "warp_ssh_manager",
  "zeroize",

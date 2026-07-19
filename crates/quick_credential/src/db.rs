@@ -7,9 +7,20 @@ use std::sync::{Mutex, OnceLock};
 
 static DB_PATH: OnceLock<PathBuf> = OnceLock::new();
 static CONN: OnceLock<Mutex<SqliteConnection>> = OnceLock::new();
+#[cfg(test)]
+thread_local! {
+    static TEST_CONN: std::cell::RefCell<Option<SqliteConnection>> = std::cell::RefCell::new(None);
+}
 
 pub fn set_database_path(path: PathBuf) {
     let _ = DB_PATH.set(path);
+}
+
+#[cfg(test)]
+pub fn set_test_conn(conn: SqliteConnection) {
+    TEST_CONN.with(|tc| {
+        tc.replace(Some(conn));
+    });
 }
 
 fn open() -> Result<SqliteConnection> {
@@ -27,6 +38,16 @@ fn open() -> Result<SqliteConnection> {
 }
 
 pub fn with_conn<R>(f: impl FnOnce(&mut SqliteConnection) -> Result<R>) -> Result<R> {
+    #[cfg(test)]
+    {
+        let mut conn_opt = TEST_CONN.with(|tc| tc.take());
+        if let Some(ref mut conn) = conn_opt {
+            let result = f(conn);
+            TEST_CONN.with(|tc| tc.replace(conn_opt));
+            return result;
+        }
+    }
+
     let mtx = CONN.get_or_init(|| Mutex::new(open().expect("warp_quick_credential db open")));
     let mut guard = mtx
         .lock()
