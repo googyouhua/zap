@@ -11,6 +11,7 @@ anyhow.workspace = true
 chrono.workspace = true
 diesel = { workspace = true, features = ["sqlite"] }
 keyring.workspace = true
+log.workspace = true
 persistence.workspace = true
 serde.workspace = true
 uuid.workspace = true
