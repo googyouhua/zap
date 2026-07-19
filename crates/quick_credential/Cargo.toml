@@ -1,0 +1,18 @@
+[package]
+name = "warp_quick_credential"
+version = "0.1.0"
+edition = "2024"
+authors.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+diesel = { workspace = true, features = ["sqlite"] }
+keyring.workspace = true
+persistence.workspace = true
+serde.workspace = true
+uuid.workspace = true
+warp_ssh_manager.workspace = true
+zeroize = "1.8"

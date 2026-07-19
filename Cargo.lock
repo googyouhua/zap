@@ -15242,6 +15242,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "warp_quick_credential"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "diesel",
+ "keyring",
+ "persistence",
+ "serde",
+ "uuid",
+ "warp_ssh_manager",
+ "zeroize",
+]
+
+[[package]]
 name = "warp_ripgrep"
 version = "0.1.0"
 dependencies = [
