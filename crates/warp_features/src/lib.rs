@@ -686,6 +686,10 @@ pub enum FeatureFlag {
     /// 关闭时,UI 入口隐藏,`Client::new()` 退回 reqwest 默认(读环境变量)。
     /// 见 Issue #72。
     HttpProxySettings,
+
+    /// 通用(非 SSH)凭据快速填充面板。允许用户在终端中输入密码/用户名
+    /// 提示时搜索已保存的凭据并注入到 PTY。
+    QuickCredentialInput,
 }
 
 static FLAG_STATES: [AtomicBool; cardinality::<FeatureFlag>()] =
@@ -748,6 +752,7 @@ pub const DOGFOOD_FLAGS: &[FeatureFlag] = &[
     FeatureFlag::ConfigurableContextWindow,
     FeatureFlag::DragTabsToWindows,
     FeatureFlag::ServerFileBrowser,
+    FeatureFlag::QuickCredentialInput,
 ];
 
 /// Features enabled for feature preview build users (e.g.: Friends of Zap).

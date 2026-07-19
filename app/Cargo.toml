@@ -575,6 +575,7 @@ default = [
     "settings_file",
     "ssh_tmux_wrapper",
     "onekey_prompt",
+    "quick_credential_input",
 ]
 # Enable this feature to automatically perform heap profiling.  NOTE: This will
 # substantially slow down program execution.
@@ -602,6 +603,7 @@ grep_tool = []
 gui = ["voice_input"]
 msys2_shells = []
 onekey_prompt = []
+quick_credential_input = []
 file_retrieval_tools = []
 welcome_tab = []
 get_started_tab = []
