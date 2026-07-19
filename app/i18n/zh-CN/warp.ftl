@@ -1873,6 +1873,7 @@ keybinding-desc-terminal-toggle-block-filter = 在所选或最近的命令块上
 keybinding-desc-terminal-toggle-sticky-command-header = 在当前面板切换粘性命令头
 keybinding-desc-terminal-toggle-autoexecute-mode = 切换自动执行模式
 keybinding-desc-terminal-toggle-queue-next-prompt = 切换排队下一条 Prompt
+keybinding-desc-terminal-toggle-quick-credential-panel = 切换快捷凭据面板
 
 # 面板组相关 binding
 keybinding-desc-pane-group-close-current-session = 关闭当前会话

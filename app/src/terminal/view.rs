@@ -58,6 +58,8 @@ use crate::ai::predict::prompt_suggestions::{
 use crate::search::slash_command_menu::static_commands::commands;
 #[cfg(feature = "quick_credential_input")]
 use crate::search::quick_credential::{QuickCredentialPanel, QuickCredentialPanelEvent};
+#[cfg(feature = "quick_credential_input")]
+use warp_quick_credential;
 use crate::ssh_manager::onekey::{load_saved_ssh_credentials, OneKeyCredentialKind};
 use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
 use crate::terminal::input::inline_menu::InlineMenuPositioner;
@@ -15542,19 +15544,50 @@ impl TerminalView {
         // Keychain + SQLite 都是同步阻塞 API,不能在 UI 线程跑。
         // 走 spawn_blocking,完成后回到主线程展示菜单。
         let future = async move {
-            tokio::task::spawn_blocking(load_saved_ssh_credentials)
-                .await
-                .unwrap_or_else(|e| Err(anyhow::anyhow!("onekey: join error: {e}")))
-        };
-        ctx.spawn(future, move |view, result, ctx| {
-            let credentials = match result {
-                Ok(credentials) => credentials,
-                Err(e) => {
-                    log::warn!("onekey: failed to load saved ssh credentials: {e:?}");
-                    return;
+            tokio::task::spawn_blocking(|| {
+                let mut candidates: Vec<OneKeyPromptCandidate> = Vec::new();
+                #[cfg(feature = "quick_credential_input")]
+                match warp_quick_credential::find_all() {
+                    Ok(creds) => {
+                        for c in creds {
+                            let subtitle = if c.username.is_empty() {
+                                String::new()
+                            } else {
+                                c.username
+                            };
+                            candidates.push(OneKeyPromptCandidate {
+                                label: c.label,
+                                subtitle,
+                                secret: c.password,
+                                kind: OneKeyCredentialKind::Password,
+                            });
+                        }
+                    }
+                    Err(e) => log::warn!("onekey: failed to load quick credentials: {e:?}"),
                 }
-            };
-            if credentials.is_empty() {
+                match load_saved_ssh_credentials() {
+                    Ok(creds) => {
+                        for c in creds {
+                            candidates.push(OneKeyPromptCandidate {
+                                label: c.label,
+                                subtitle: c.subtitle,
+                                secret: c.secret,
+                                kind: c.kind,
+                            });
+                        }
+                    }
+                    Err(e) => log::warn!("onekey: failed to load saved ssh credentials: {e:?}"),
+                }
+                candidates
+            })
+                .await
+                .unwrap_or_else(|e| {
+                    log::warn!("onekey: join error: {e}");
+                    Vec::new()
+                })
+        };
+        ctx.spawn(future, move |view, candidates, ctx| {
+            if candidates.is_empty() {
                 return;
             }
             // 二次确认:加载途中可能用户已经手动打开菜单或 injector 起飞了。
@@ -15562,15 +15595,7 @@ impl TerminalView {
                 return;
             }
 
-            view.onekey_prompt_candidates = credentials
-                .into_iter()
-                .map(|credential| OneKeyPromptCandidate {
-                    label: credential.label,
-                    subtitle: credential.subtitle,
-                    secret: credential.secret,
-                    kind: credential.kind,
-                })
-                .collect();
+            view.onekey_prompt_candidates = candidates;
             view.onekey_query.clear();
             // 复用常驻 editor:清空内容、把焦点稍后转过来。
             view.onekey_search_editor

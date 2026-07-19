@@ -576,6 +576,14 @@ pub fn init(app: &mut AppContext) {
             id!("Terminal") & !id!("IMEOpen") & (id!("LongRunningCommand") | id!("AltScreen")),
         )
         .with_key_binding("shift-tab"),
+        #[cfg(feature = "quick_credential_input")]
+        EditableBinding::new(
+            "terminal:toggle_quick_credential_panel",
+            crate::t!("keybinding-desc-terminal-toggle-quick-credential-panel"),
+            TerminalAction::ToggleQuickCredentialPanel,
+        )
+        .with_key_binding(cmd_or_ctrl_shift("u"))
+        .with_context_predicate(id!("Terminal") & !id!("IMEOpen")),
     ]);
 
     app.register_editable_bindings([
