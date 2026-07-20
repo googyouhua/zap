@@ -107,7 +107,8 @@ impl QuickCredentialsPageView {
         let credentials = load_credentials();
         let mut button_states = HashMap::new();
         for c in &credentials {
-            button_states.entry(c.id.clone()).or_default();
+            button_states.entry(format!("edit_{}", c.id)).or_default();
+            button_states.entry(format!("delete_{}", c.id)).or_default();
         }
 
         let me = Self {
@@ -177,11 +178,16 @@ impl QuickCredentialsPageView {
     fn refresh_list(&mut self) {
         self.credentials = load_credentials();
         self.button_states.retain(|k, _| {
-            self.credentials.iter().any(|c| c.id == *k)
+            self.credentials.iter().any(|c| {
+                k == &format!("edit_{}", c.id) || k == &format!("delete_{}", c.id)
+            })
         });
         for c in &self.credentials {
             self.button_states
-                .entry(c.id.clone())
+                .entry(format!("edit_{}", c.id))
+                .or_default();
+            self.button_states
+                .entry(format!("delete_{}", c.id))
                 .or_default();
         }
     }
@@ -213,9 +219,14 @@ impl QuickCredentialsPageView {
         } else {
             for credential in &self.credentials {
                 let id = credential.id.clone();
-                let mouse_state = self
+                let edit_mouse = self
                     .button_states
-                    .get(&id)
+                    .get(&format!("edit_{}", id))
+                    .cloned()
+                    .unwrap_or_default();
+                let delete_mouse = self
+                    .button_states
+                    .get(&format!("delete_{}", id))
                     .cloned()
                     .unwrap_or_default();
 
@@ -259,14 +270,14 @@ impl QuickCredentialsPageView {
                     .with_child(render_small_button(
                         appearance,
                         "Edit".to_string(),
-                        mouse_state.clone(),
+                        edit_mouse,
                         QuickCredentialsPageAction::ShowEditForm(id.clone()),
                     ))
                     .with_child(
                         Container::new(render_small_button(
                             appearance,
                             "Delete".to_string(),
-                            mouse_state,
+                            delete_mouse,
                             QuickCredentialsPageAction::ShowDeleteConfirmation(id.clone()),
                         ))
                         .with_margin_left(4.)
