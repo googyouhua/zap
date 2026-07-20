@@ -12,7 +12,7 @@ use warpui::{
         button::ButtonVariant,
         components::{Coords, UiComponent, UiComponentStyles},
     },
-    AppContext, Entity, SingletonEntity, TypedActionView, View, ViewContext, ViewHandle,
+    AppContext, Entity, SingletonEntity, TypedActionView, UpdateView, View, ViewContext, ViewHandle,
 };
 
 use warp_quick_credential::{QuickCredential, SendMode};
@@ -506,29 +506,42 @@ impl TypedActionView for QuickCredentialsPageView {
             }
             QuickCredentialsPageAction::ShowDeleteConfirmation(credential_id) => {
                 let id = credential_id.clone();
+                let view_handle = ctx.handle();
                 let label = self
                     .credentials
                     .iter()
                     .find(|c| c.id == *credential_id)
                     .map(|c| c.label.clone())
                     .unwrap_or_default();
-                let dialog = AlertDialogWithCallbacks::for_view(
+                let dialog = AlertDialogWithCallbacks::for_app(
                     format!("Delete \"{label}\"?"),
                     "This action cannot be undone.",
                     vec![
-                        ModalButton::for_view(
-                            "Delete",
-                            move |me: &mut QuickCredentialsPageView, ctx| {
-                                report_if_error!(warp_quick_credential::delete(&id));
-                                me.refresh_list();
-                                ctx.notify();
-                            },
-                        ),
-                        ModalButton::for_view("Cancel", |_, _| {}),
+                        ModalButton::for_app("Delete", {
+                            let view_handle = view_handle.clone();
+                            move |app| {
+                                let _ = warp_quick_credential::delete(&id);
+                                if let Some(handle) = view_handle.upgrade(app) {
+                                    app.update_view(&handle, |me, ctx| {
+                                        me.refresh_list();
+                                        ctx.notify();
+                                    });
+                                }
+                            }
+                        }),
+                        ModalButton::for_app("Cancel", |_| {}),
                     ],
-                    |_, _| {},
+                    |_| {},
                 );
-                ctx.show_native_platform_modal(dialog);
+                let window_id = ctx.window_id();
+                let workspace = ctx
+                    .views_of_type::<crate::workspace::Workspace>(window_id)
+                    .and_then(|workspaces| workspaces.first().cloned());
+                if let Some(workspace) = workspace {
+                    workspace.update(ctx, |view, ctx| {
+                        view.show_native_modal(dialog, ctx);
+                    });
+                }
             }
             QuickCredentialsPageAction::SetSendMode(mode) => {
                 self.edit_send_mode = mode.clone();
