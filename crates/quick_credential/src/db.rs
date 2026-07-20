@@ -5,6 +5,23 @@ use diesel::sqlite::SqliteConnection;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
+fn ensure_columns(conn: &mut SqliteConnection) -> Result<()> {
+    #[derive(diesel::QueryableByName)]
+    struct ColName {
+        #[diesel(sql_type = diesel::sql_types::Text)]
+        name: String,
+    }
+    let cols: Vec<ColName> =
+        diesel::sql_query("SELECT name FROM pragma_table_info('quick_credentials')")
+            .load(conn)?;
+    if !cols.iter().any(|c| c.name == "encrypted_password") {
+        conn.batch_execute(
+            "ALTER TABLE quick_credentials ADD COLUMN encrypted_password TEXT NOT NULL DEFAULT '';",
+        )?;
+    }
+    Ok(())
+}
+
 static DB_PATH: OnceLock<PathBuf> = OnceLock::new();
 static CONN: OnceLock<Mutex<SqliteConnection>> = OnceLock::new();
 #[cfg(test)]
@@ -47,6 +64,7 @@ fn open() -> Result<SqliteConnection> {
             updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         );",
     )?;
+    ensure_columns(&mut conn)?;
     Ok(conn)
 }
 
