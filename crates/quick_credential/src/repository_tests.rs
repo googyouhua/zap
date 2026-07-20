@@ -15,13 +15,14 @@ fn setup_db() -> NamedTempFile {
         .expect("failed to open sqlite");
     conn.batch_execute(
         "CREATE TABLE IF NOT EXISTS quick_credentials (
-            id         TEXT PRIMARY KEY NOT NULL,
-            label      TEXT NOT NULL,
-            username   TEXT NOT NULL DEFAULT '',
-            send_mode  TEXT NOT NULL DEFAULT 'password_only',
-            notes      TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            id                TEXT PRIMARY KEY NOT NULL,
+            label             TEXT NOT NULL,
+            username          TEXT NOT NULL DEFAULT '',
+            send_mode         TEXT NOT NULL DEFAULT 'password_only',
+            notes             TEXT NOT NULL DEFAULT '',
+            encrypted_password TEXT NOT NULL DEFAULT '',
+            created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );"
     ).expect("failed to init schema");
     set_test_conn(conn);

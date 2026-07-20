@@ -15252,8 +15252,6 @@ dependencies = [
  "keyring",
  "log",
  "persistence",
- "serde",
- "serde_json",
  "tempfile",
  "uuid",
  "warp_ssh_manager",
