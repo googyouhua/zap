@@ -1,5 +1,5 @@
 use super::filter_credentials;
-use warp_quick_credential::{QuickCredential, SendMode};
+use warp_quick_credential::QuickCredential;
 use zeroize::Zeroizing;
 
 fn cred(label: &str, username: &str) -> QuickCredential {
@@ -7,7 +7,6 @@ fn cred(label: &str, username: &str) -> QuickCredential {
         id: String::new(),
         label: label.into(),
         username: username.into(),
-        send_mode: SendMode::PasswordOnly,
         notes: String::new(),
         password: Zeroizing::new("pwd".into()),
     }

@@ -62,6 +62,8 @@ pub struct QuickCredentialPanel {
     mode: PanelMode,
 }
 
+use warp_quick_credential::SendMode;
+
 #[derive(Clone, Debug)]
 pub enum QuickCredentialPanelAction {
     ResultClicked {
@@ -76,6 +78,7 @@ pub enum QuickCredentialPanelAction {
 pub enum QuickCredentialPanelEvent {
     ItemSelected {
         credential: warp_quick_credential::QuickCredential,
+        mode: SendMode,
     },
     Close,
     Open,
@@ -201,9 +204,10 @@ impl QuickCredentialPanel {
         credential: warp_quick_credential::QuickCredential,
         ctx: &mut ViewContext<Self>,
     ) {
-        let mut credential = credential;
-        credential.send_mode = warp_quick_credential::SendMode::PasswordOnly;
-        ctx.emit(QuickCredentialPanelEvent::ItemSelected { credential });
+        ctx.emit(QuickCredentialPanelEvent::ItemSelected {
+            credential,
+            mode: SendMode::PasswordOnly,
+        });
         self.close(ctx);
     }
 
@@ -212,9 +216,10 @@ impl QuickCredentialPanel {
         credential: warp_quick_credential::QuickCredential,
         ctx: &mut ViewContext<Self>,
     ) {
-        let mut credential = credential;
-        credential.send_mode = warp_quick_credential::SendMode::UsernameThenPassword;
-        ctx.emit(QuickCredentialPanelEvent::ItemSelected { credential });
+        ctx.emit(QuickCredentialPanelEvent::ItemSelected {
+            credential,
+            mode: SendMode::UsernameThenPassword,
+        });
         self.close(ctx);
     }
 
