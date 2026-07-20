@@ -1,10 +1,15 @@
 use anyhow::{anyhow, Result};
 use crate::db;
 use crate::secret_store::QuickCredentialSecretStore;
-use crate::types::{QuickCredential, SendMode};
+use crate::types::{
+    PromptTriggerRule, QuickCredential, SendMode,
+    DEFAULT_PASSWORD_ONLY_KEYWORDS, DEFAULT_USERNAME_AND_PASSWORD_KEYWORDS,
+};
 use chrono::Utc;
+use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use persistence::model::QuickCredentialRow;
+use persistence::schema::prompt_trigger_rules;
 use persistence::schema::quick_credentials;
 use uuid::Uuid;
 use zeroize::Zeroizing;
@@ -17,7 +22,6 @@ fn row_to_credential(
         id: row.id,
         label: row.label,
         username: row.username,
-        send_mode: SendMode::from_str(&row.send_mode),
         notes: row.notes,
         password,
     }
@@ -96,7 +100,6 @@ pub fn create(credential: &QuickCredential) -> Result<QuickCredential> {
                 quick_credentials::id.eq(&id),
                 quick_credentials::label.eq(&credential.label),
                 quick_credentials::username.eq(&credential.username),
-                quick_credentials::send_mode.eq(credential.send_mode.as_str()),
                 quick_credentials::notes.eq(&credential.notes),
                 quick_credentials::created_at.eq(&now),
                 quick_credentials::updated_at.eq(&now),
@@ -109,7 +112,6 @@ pub fn create(credential: &QuickCredential) -> Result<QuickCredential> {
             id,
             label: credential.label.clone(),
             username: credential.username.clone(),
-            send_mode: credential.send_mode.clone(),
             notes: credential.notes.clone(),
             password: credential.password.clone(),
         })
@@ -124,7 +126,6 @@ pub fn update(credential: &QuickCredential) -> Result<QuickCredential> {
             .set((
                 quick_credentials::label.eq(&credential.label),
                 quick_credentials::username.eq(&credential.username),
-                quick_credentials::send_mode.eq(credential.send_mode.as_str()),
                 quick_credentials::notes.eq(&credential.notes),
                 quick_credentials::updated_at.eq(&now),
             ))
@@ -137,6 +138,80 @@ pub fn update(credential: &QuickCredential) -> Result<QuickCredential> {
         store_password(conn, &credential.id, &credential.password)?;
 
         Ok(credential.clone())
+    })
+}
+
+pub fn list_rules() -> Result<Vec<PromptTriggerRule>> {
+    db::with_conn(|conn| {
+        let rows: Vec<persistence::model::PromptTriggerRuleRow> =
+            prompt_trigger_rules::table.load(conn)?;
+        Ok(rows
+            .into_iter()
+            .map(|r| PromptTriggerRule {
+                id: r.id,
+                keyword: r.keyword,
+                send_mode: if r.send_mode == "username_then_password" {
+                    SendMode::UsernameThenPassword
+                } else {
+                    SendMode::PasswordOnly
+                },
+            })
+            .collect())
+    })
+}
+
+pub fn add_rule(keyword: &str, send_mode: SendMode) -> Result<PromptTriggerRule> {
+    let id = Uuid::new_v4().to_string();
+    let mode_str = send_mode.as_str();
+
+    db::with_conn(|conn| {
+        diesel::insert_into(prompt_trigger_rules::table)
+            .values((
+                prompt_trigger_rules::id.eq(&id),
+                prompt_trigger_rules::keyword.eq(keyword),
+                prompt_trigger_rules::send_mode.eq(mode_str),
+            ))
+            .execute(conn)?;
+        Ok(PromptTriggerRule {
+            id,
+            keyword: keyword.to_string(),
+            send_mode,
+        })
+    })
+}
+
+pub fn remove_rule(rule_id: &str) -> Result<()> {
+    db::with_conn(|conn| {
+        diesel::delete(prompt_trigger_rules::table.find(rule_id))
+            .execute(conn)?;
+        Ok(())
+    })
+}
+
+pub fn reset_rules_to_defaults() -> Result<()> {
+    db::with_conn(|conn| {
+        conn.batch_execute("DELETE FROM prompt_trigger_rules")?;
+        for kw in DEFAULT_PASSWORD_ONLY_KEYWORDS {
+            let id = Uuid::new_v4().to_string();
+            diesel::insert_into(prompt_trigger_rules::table)
+                .values((
+                    prompt_trigger_rules::id.eq(&id),
+                    prompt_trigger_rules::keyword.eq(kw),
+                    prompt_trigger_rules::send_mode.eq("password_only"),
+                ))
+                .execute(conn)?;
+        }
+        for kw in DEFAULT_USERNAME_AND_PASSWORD_KEYWORDS {
+            let id = Uuid::new_v4().to_string();
+            diesel::insert_into(prompt_trigger_rules::table)
+                .values((
+                    prompt_trigger_rules::id.eq(&id),
+                    prompt_trigger_rules::keyword.eq(kw),
+                    prompt_trigger_rules::send_mode.eq("username_then_password"),
+                ))
+                .execute(conn)?;
+        }
+        Ok(())
     })
 }
 

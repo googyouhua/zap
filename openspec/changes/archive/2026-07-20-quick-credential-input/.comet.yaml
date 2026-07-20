@@ -17,6 +17,6 @@ verification_report: docs/superpowers/reports/2026-07-20-quick-credential-input-
 branch_status: handled
 created_at: 2026-07-19
 verified_at: 2026-07-20
-archived: false
+archived: true
 handoff_context: openspec/changes/quick-credential-input/.comet/handoff/design-context.json
 handoff_hash: bb3bca61b91de1d1bf7e0449bcad8a9e1a0884ec71ca7d7cc15ff8106d9c49d9
