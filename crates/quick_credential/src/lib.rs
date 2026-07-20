@@ -8,7 +8,7 @@ pub use db::{set_database_path, with_conn};
 pub use db::set_test_conn;
 pub use repository::{
     add_rule, create, delete, find_all, find_by_id, list_rules, remove_rule,
-    reset_rules_to_defaults, update,
+    reset_rules_for_mode, reset_rules_to_defaults, update,
 };
 pub use secret_store::QuickCredentialSecretStore;
 pub use types::{
