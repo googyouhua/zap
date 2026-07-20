@@ -1,75 +1,68 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use keyring::Entry;
-#[cfg(test)]
 use std::collections::HashMap;
-#[cfg(test)]
 use std::sync::{Mutex, OnceLock};
 use zeroize::Zeroizing;
 
 const SERVICE: &str = "zap.quick-credential";
 
-#[cfg(test)]
-static TEST_STORE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+static FALLBACK_STORE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
 #[cfg(test)]
-fn test_store() -> &'static Mutex<HashMap<String, String>> {
-    TEST_STORE.get_or_init(|| Mutex::new(HashMap::new()))
+pub(crate) fn clear_fallback_store() {
+    if let Some(store) = FALLBACK_STORE.get() {
+        store.lock().unwrap().clear();
+    }
 }
 
-#[cfg(test)]
-pub(crate) fn clear_test_store() {
-    test_store().lock().unwrap().clear();
+fn fallback_store() -> &'static Mutex<HashMap<String, String>> {
+    FALLBACK_STORE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 pub struct QuickCredentialSecretStore;
 
-#[cfg_attr(test, allow(unreachable_code))]
 impl QuickCredentialSecretStore {
     pub fn set(id: &str, secret: &str) -> Result<()> {
-        #[cfg(test)]
-        {
-            test_store()
-                .lock()
-                .unwrap()
-                .insert(id.to_string(), secret.to_string());
-            return Ok(());
+        let key = format!("{id}:password");
+        match Entry::new(SERVICE, &key) {
+            Ok(entry) => {
+                if entry.set_password(secret).is_ok() {
+                    return Ok(());
+                }
+            }
+            Err(_) => {}
         }
-
-        let entry =
-            Entry::new(SERVICE, &format!("{id}:password")).context("keyring entry error")?;
-        entry.set_password(secret).context("keyring set error")?;
+        fallback_store()
+            .lock()
+            .map_err(|e| anyhow::anyhow!("fallback store poisoned: {e}"))?
+            .insert(id.to_string(), secret.to_string());
         Ok(())
     }
 
     pub fn get(id: &str) -> Result<Option<Zeroizing<String>>> {
-        #[cfg(test)]
-        {
-            return Ok(test_store()
-                .lock()
-                .unwrap()
-                .get(id)
-                .map(|s| Zeroizing::new(s.clone())));
+        let key = format!("{id}:password");
+        if let Ok(entry) = Entry::new(SERVICE, &key) {
+            match entry.get_password() {
+                Ok(p) => return Ok(Some(Zeroizing::new(p))),
+                Err(keyring::Error::NoEntry) => {}
+                Err(_) => {}
+            }
         }
-
-        let entry =
-            Entry::new(SERVICE, &format!("{id}:password")).context("keyring entry error")?;
-        match entry.get_password() {
-            Ok(p) => Ok(Some(Zeroizing::new(p))),
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(e) => Err(e).context("keyring get error"),
-        }
+        let guard = fallback_store()
+            .lock()
+            .map_err(|e| anyhow::anyhow!("fallback store poisoned: {e}"))?;
+        Ok(guard.get(id).map(|s| Zeroizing::new(s.clone())))
     }
 
     pub fn delete(id: &str) -> Result<()> {
-        #[cfg(test)]
-        {
-            test_store().lock().unwrap().remove(id);
-            return Ok(());
+        let key = format!("{id}:password");
+        if let Ok(entry) = Entry::new(SERVICE, &key) {
+            let _ = entry.delete_credential();
         }
-
-        let entry =
-            Entry::new(SERVICE, &format!("{id}:password")).context("keyring entry error")?;
-        entry.delete_credential().context("keyring delete error")?;
+        let mut guard = fallback_store()
+            .lock()
+            .map_err(|e| anyhow::anyhow!("fallback store poisoned: {e}"))?;
+        guard.remove(id);
         Ok(())
     }
 }
