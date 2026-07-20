@@ -15542,29 +15542,37 @@ impl TerminalView {
         self.onekey_last_prompt_at = Some(Instant::now());
 
         // Keychain + SQLite 都是同步阻塞 API,不能在 UI 线程跑。
-        // 走 spawn_blocking,完成后回到主线程展示菜单。
+        // 走 spawn_blocking,完成后回到主线程展示菜单或自动填写。
         let future = async move {
             tokio::task::spawn_blocking(|| {
                 let mut candidates: Vec<OneKeyPromptCandidate> = Vec::new();
                 #[cfg(feature = "quick_credential_input")]
-                match warp_quick_credential::find_all() {
+                let quick_creds = match warp_quick_credential::find_all() {
                     Ok(creds) => {
-                        for c in creds {
+                        for c in &creds {
                             let subtitle = if c.username.is_empty() {
                                 String::new()
                             } else {
-                                c.username
+                                c.username.clone()
                             };
                             candidates.push(OneKeyPromptCandidate {
-                                label: c.label,
+                                label: c.label.clone(),
                                 subtitle,
-                                secret: c.password,
+                                secret: c.password.clone(),
                                 kind: OneKeyCredentialKind::Password,
                             });
                         }
+                        creds
                     }
-                    Err(e) => log::warn!("onekey: failed to load quick credentials: {e:?}"),
-                }
+                    Err(e) => {
+                        log::warn!("onekey: failed to load quick credentials: {e:?}");
+                        Vec::new()
+                    }
+                };
+                #[cfg(feature = "quick_credential_input")]
+                let trigger_rules = warp_quick_credential::list_rules().unwrap_or_default();
+                #[cfg(not(feature = "quick_credential_input"))]
+                let (quick_creds, trigger_rules): (Vec<_>, Vec<_>) = (Vec::new(), Vec::new());
                 match load_saved_ssh_credentials() {
                     Ok(creds) => {
                         for c in creds {
@@ -15578,21 +15586,43 @@ impl TerminalView {
                     }
                     Err(e) => log::warn!("onekey: failed to load saved ssh credentials: {e:?}"),
                 }
-                candidates
+                (candidates, quick_creds, trigger_rules)
             })
                 .await
                 .unwrap_or_else(|e| {
                     log::warn!("onekey: join error: {e}");
-                    Vec::new()
+                    (Vec::new(), Vec::new(), Vec::new())
                 })
         };
-        ctx.spawn(future, move |view, candidates, ctx| {
+        ctx.spawn(future, move |view, (candidates, quick_creds, trigger_rules), ctx| {
             if candidates.is_empty() {
                 return;
             }
             // 二次确认:加载途中可能用户已经手动打开菜单或 injector 起飞了。
             if view.context_menu_state.is_some() || view.ssh_secret_auto_injection_in_flight {
                 return;
+            }
+
+            // 如果只有一条快速凭据且提示匹配关键字,自动发送而不弹菜单。
+            #[cfg(feature = "quick_credential_input")]
+            if quick_creds.len() == 1 && !trigger_rules.is_empty() {
+                let model = view.model.lock();
+                let block = model.block_list().active_block();
+                let output = block.output_grid().contents_to_string(false, Some(10));
+                drop(model);
+                if let Some(mode) = crate::terminal::prompt_detection::classify_prompt(
+                    &output,
+                    &trigger_rules,
+                ) {
+                    let cred = quick_creds.first().unwrap();
+                    crate::terminal::quick_credential_sender::send_quick_credential(
+                        view,
+                        cred,
+                        mode,
+                        ctx,
+                    );
+                    return;
+                }
             }
 
             view.onekey_prompt_candidates = candidates;
@@ -15800,13 +15830,11 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            QuickCredentialPanelEvent::ItemSelected { credential } => {
-                let mode = credential.send_mode.clone();
-                let credential = credential.clone();
+            QuickCredentialPanelEvent::ItemSelected { credential, mode } => {
                 crate::terminal::quick_credential_sender::send_quick_credential(
                     self,
-                    &credential,
-                    mode,
+                    credential,
+                    *mode,
                     ctx,
                 );
                 self.quick_credential_panel_open = false;

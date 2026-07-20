@@ -15,7 +15,7 @@ use warpui::{
     AppContext, Entity, SingletonEntity, TypedActionView, UpdateView, View, ViewContext, ViewHandle,
 };
 
-use warp_quick_credential::{QuickCredential, SendMode};
+use warp_quick_credential::{PromptTriggerRule, QuickCredential, SendMode};
 
 use super::settings_page::{
     render_page_title, render_sub_header_with_description,
@@ -26,10 +26,10 @@ use super::SettingsSection;
 use crate::appearance::Appearance;
 use crate::editor::{EditorView, SingleLineEditorOptions, TextOptions};
 use crate::report_if_error;
-use crate::view_components::dropdown::{Dropdown, DropdownItem};
 
 const FORM_HALF_GAP: f32 = 8.;
 const FORM_ROW_GAP: f32 = 16.;
+const CHIP_GAP: f32 = 6.;
 
 #[derive(Debug, Clone)]
 pub enum QuickCredentialsPageAction {
@@ -38,12 +38,16 @@ pub enum QuickCredentialsPageAction {
     CancelForm,
     SaveForm,
     ShowDeleteConfirmation(String),
-    SetSendMode(SendMode),
     SetLabel(String),
     SetUsername(String),
     SetPassword(String),
     SetNotes(String),
     RefreshList,
+    BeginAddKeyword(SendMode),
+    CommitAddKeyword,
+    CancelAddKeyword,
+    RemoveKeyword(String),
+    ResetKeywords,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -62,42 +66,29 @@ pub struct QuickCredentialsPageView {
     edit_username: String,
     edit_password: String,
     edit_notes: String,
-    edit_send_mode: SendMode,
     label_editor: ViewHandle<EditorView>,
     username_editor: ViewHandle<EditorView>,
     password_editor: ViewHandle<EditorView>,
     notes_editor: ViewHandle<EditorView>,
-    send_mode_dropdown: ViewHandle<Dropdown<QuickCredentialsPageAction>>,
     button_states: HashMap<String, MouseStateHandle>,
     add_button_state: MouseStateHandle,
     save_button_state: MouseStateHandle,
     cancel_button_state: MouseStateHandle,
+    trigger_rules: Vec<PromptTriggerRule>,
+    adding_keyword_mode: Option<SendMode>,
+    keyword_editor: ViewHandle<EditorView>,
+    add_keyword_button_states: HashMap<String, MouseStateHandle>,
+    remove_keyword_button_states: HashMap<String, MouseStateHandle>,
+    reset_button_state: MouseStateHandle,
 }
 
 impl QuickCredentialsPageView {
     pub fn new(ctx: &mut ViewContext<Self>) -> Self {
-        let send_mode_dropdown =
-            ctx.add_typed_action_view(Dropdown::<QuickCredentialsPageAction>::new);
-        send_mode_dropdown.update(ctx, |dropdown, ctx| {
-            dropdown.set_items(
-                vec![
-                    DropdownItem::new(
-                        "Password Only".to_string(),
-                        QuickCredentialsPageAction::SetSendMode(SendMode::PasswordOnly),
-                    ),
-                    DropdownItem::new(
-                        "Username + Password".to_string(),
-                        QuickCredentialsPageAction::SetSendMode(SendMode::UsernameThenPassword),
-                    ),
-                ],
-                ctx,
-            );
-        });
-
         let label_editor = build_editor(ctx, "Label".to_string());
         let username_editor = build_editor(ctx, "Username".to_string());
         let password_editor = build_password_editor(ctx);
         let notes_editor = build_editor(ctx, "Notes (optional)".to_string());
+        let keyword_editor = build_editor(ctx, "Type keyword...".to_string());
 
         let credentials = load_credentials();
         let mut button_states = HashMap::new();
@@ -106,7 +97,19 @@ impl QuickCredentialsPageView {
             button_states.entry(format!("delete_{}", c.id)).or_default();
         }
 
-        let me = Self {
+        let trigger_rules = load_rules();
+        let mut add_keyword_button_states = HashMap::new();
+        let mut remove_keyword_button_states = HashMap::new();
+        for r in &trigger_rules {
+            add_keyword_button_states
+                .entry(format!("add_{}", r.send_mode.as_str()))
+                .or_default();
+            remove_keyword_button_states
+                .entry(r.id.clone())
+                .or_default();
+        }
+
+        Self {
             page: PageType::new_monolith(QuickCredentialsWidget::default(), None, false),
             credentials,
             mode: PageMode::List,
@@ -114,30 +117,21 @@ impl QuickCredentialsPageView {
             edit_username: String::new(),
             edit_password: String::new(),
             edit_notes: String::new(),
-            edit_send_mode: SendMode::PasswordOnly,
             label_editor,
             username_editor,
             password_editor,
             notes_editor,
-            send_mode_dropdown,
             button_states,
             add_button_state: MouseStateHandle::default(),
             save_button_state: MouseStateHandle::default(),
             cancel_button_state: MouseStateHandle::default(),
-        };
-
-        me.sync_dropdown(ctx);
-        me
-    }
-
-    fn sync_dropdown(&self, ctx: &mut ViewContext<Self>) {
-        let label = match self.edit_send_mode {
-            SendMode::PasswordOnly => "Password Only",
-            SendMode::UsernameThenPassword => "Username + Password",
-        };
-        self.send_mode_dropdown.update(ctx, |dropdown, ctx| {
-            dropdown.set_selected_by_name(label.to_string(), ctx);
-        });
+            trigger_rules,
+            adding_keyword_mode: None,
+            keyword_editor,
+            add_keyword_button_states,
+            remove_keyword_button_states,
+            reset_button_state: MouseStateHandle::default(),
+        }
     }
 
     fn populate(&mut self, credential: &QuickCredential, ctx: &mut ViewContext<Self>) {
@@ -157,8 +151,6 @@ impl QuickCredentialsPageView {
         self.edit_username = credential.username.clone();
         self.edit_password = credential.password.to_string();
         self.edit_notes = credential.notes.clone();
-        self.edit_send_mode = credential.send_mode.clone();
-        self.sync_dropdown(ctx);
     }
 
     fn sync_edit_fields(&mut self, ctx: &mut ViewContext<Self>) {
@@ -185,6 +177,260 @@ impl QuickCredentialsPageView {
         }
     }
 
+    fn refresh_rules(&mut self) {
+        self.trigger_rules = load_rules();
+        self.add_keyword_button_states.clear();
+        self.remove_keyword_button_states.clear();
+        for r in &self.trigger_rules {
+            self.add_keyword_button_states
+                .entry(format!("add_{}", r.send_mode.as_str()))
+                .or_default();
+            self.remove_keyword_button_states
+                .entry(r.id.clone())
+                .or_default();
+        }
+    }
+
+    fn render_trigger_keywords_section(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let mut section = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start);
+
+        section.add_child(render_sub_header_with_description(
+            appearance,
+            "Auto-fill Trigger Keywords",
+            "When terminal output matches a keyword, the credential is auto-sent with the matching mode.",
+        ));
+
+        let password_only_rules: Vec<_> = self
+            .trigger_rules
+            .iter()
+            .filter(|r| r.send_mode == SendMode::PasswordOnly)
+            .collect();
+        let username_rules: Vec<_> = self
+            .trigger_rules
+            .iter()
+            .filter(|r| r.send_mode == SendMode::UsernameThenPassword)
+            .collect();
+
+        section.add_child(Self::render_keyword_group(
+            appearance,
+            "Only Password",
+            &password_only_rules,
+            SendMode::PasswordOnly,
+            &self.remove_keyword_button_states,
+            &self.adding_keyword_mode,
+            &self.keyword_editor,
+            &self.reset_button_state,
+        ));
+
+        section.add_child(Self::render_keyword_group(
+            appearance,
+            "Username + Password",
+            &username_rules,
+            SendMode::UsernameThenPassword,
+            &self.remove_keyword_button_states,
+            &self.adding_keyword_mode,
+            &self.keyword_editor,
+            &self.reset_button_state,
+        ));
+
+        Container::new(section.finish())
+            .with_background(appearance.theme().surface_1())
+            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
+            .with_uniform_padding(10.)
+            .with_margin_bottom(16.)
+            .finish()
+    }
+
+    fn render_keyword_group(
+        appearance: &Appearance,
+        group_label: &str,
+        rules: &[&PromptTriggerRule],
+        mode: SendMode,
+        remove_keyword_button_states: &HashMap<String, MouseStateHandle>,
+        adding_keyword_mode: &Option<SendMode>,
+        keyword_editor: &ViewHandle<EditorView>,
+        reset_button_state: &MouseStateHandle,
+    ) -> Box<dyn Element> {
+        let mut group = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start);
+
+        let is_adding = adding_keyword_mode.map_or(false, |am| am == mode);
+
+        // header row: label + +Add button + (Reset button only on PasswordOnly group)
+        let mut header = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(
+                Text::new_inline(
+                    format!("{}: ", group_label),
+                    appearance.ui_font_family(),
+                    appearance.ui_font_size(),
+                )
+                .with_color(appearance.theme().active_ui_text_color().into())
+                .finish(),
+            );
+
+        if is_adding {
+            header.add_child(
+                Container::new(ChildView::new(keyword_editor).finish())
+                    .with_margin_right(CHIP_GAP)
+                    .finish(),
+            );
+            header.add_child(
+                Container::new(
+                    appearance
+                        .ui_builder()
+                        .button(ButtonVariant::Accent, MouseStateHandle::default())
+                        .with_style(UiComponentStyles {
+                            font_size: Some(appearance.ui_font_size()),
+                            padding: Some(Coords::uniform(3.)),
+                            ..Default::default()
+                        })
+                        .with_text_label("OK".to_string())
+                        .build()
+                        .on_click(|ctx, _, _| {
+                            ctx.dispatch_typed_action(
+                                QuickCredentialsPageAction::CommitAddKeyword,
+                            );
+                        })
+                        .finish(),
+                )
+                .with_margin_right(4.)
+                .finish(),
+            );
+            header.add_child(
+                Container::new(
+                    appearance
+                        .ui_builder()
+                        .button(ButtonVariant::Text, MouseStateHandle::default())
+                        .with_style(UiComponentStyles {
+                            font_size: Some(appearance.ui_font_size()),
+                            padding: Some(Coords::uniform(3.)),
+                            ..Default::default()
+                        })
+                        .with_text_label("Cancel".to_string())
+                        .build()
+                        .on_click(|ctx, _, _| {
+                            ctx.dispatch_typed_action(
+                                QuickCredentialsPageAction::CancelAddKeyword,
+                            );
+                        })
+                        .finish(),
+                )
+                .with_margin_right(4.)
+                .finish(),
+            );
+        } else {
+            header.add_child(
+                appearance
+                    .ui_builder()
+                    .button(ButtonVariant::Accent, MouseStateHandle::default())
+                    .with_style(UiComponentStyles {
+                        font_size: Some(appearance.ui_font_size()),
+                        padding: Some(Coords::uniform(3.)),
+                        ..Default::default()
+                    })
+                    .with_text_label("+ Add".to_string())
+                    .build()
+                    .on_click(move |ctx, _, _| {
+                        ctx.dispatch_typed_action(
+                            QuickCredentialsPageAction::BeginAddKeyword(mode),
+                        );
+                    })
+                    .finish(),
+            );
+            if adding_keyword_mode.is_none() && group_label == "Only Password" {
+                header.add_child(
+                    Container::new(
+                        appearance
+                            .ui_builder()
+                            .button(ButtonVariant::Text, reset_button_state.clone())
+                            .with_style(UiComponentStyles {
+                                font_size: Some(appearance.ui_font_size()),
+                                padding: Some(Coords::uniform(3.)),
+                                ..Default::default()
+                            })
+                            .with_text_label("Reset".to_string())
+                            .build()
+                            .on_click(|ctx, _, _| {
+                                ctx.dispatch_typed_action(
+                                    QuickCredentialsPageAction::ResetKeywords,
+                                );
+                            })
+                            .finish(),
+                    )
+                    .with_margin_left(8.)
+                    .finish(),
+                );
+            }
+        }
+        group.add_child(header.finish());
+
+        // render keywords as chips
+        if !rules.is_empty() {
+            let mut chips = Flex::row()
+                .with_cross_axis_alignment(CrossAxisAlignment::Center);
+            for rule in rules {
+                let mouse = remove_keyword_button_states
+                    .get(&rule.id)
+                    .cloned()
+                    .unwrap_or_default();
+                let id = rule.id.clone();
+                chips.add_child(
+                    Container::new(
+                        Flex::row()
+                            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                            .with_child(
+                                Text::new_inline(
+                                    rule.keyword.clone(),
+                                    appearance.ui_font_family(),
+                                    appearance.ui_font_size(),
+                                )
+                                .with_color(appearance.theme().active_ui_text_color().into())
+                                .finish(),
+                            )
+                            .with_child(
+                                Container::new(
+                                    appearance
+                                        .ui_builder()
+                                        .button(ButtonVariant::Text, mouse)
+                                        .with_style(UiComponentStyles {
+                                            font_size: Some(appearance.ui_font_size()),
+                                            padding: Some(Coords::uniform(2.)),
+                                            ..Default::default()
+                                        })
+                                        .with_text_label("×".to_string())
+                                        .build()
+                                        .on_click(move |ctx, _, _| {
+                                            ctx.dispatch_typed_action(
+                                                QuickCredentialsPageAction::RemoveKeyword(id.clone()),
+                                            );
+                                        })
+                                        .finish(),
+                                )
+                                .with_margin_left(4.)
+                                .finish(),
+                            )
+                            .finish(),
+                    )
+                    .with_background(appearance.theme().surface_2())
+                    .with_corner_radius(CornerRadius::with_all(Radius::Pixels(3.)))
+                    .with_uniform_padding(6.)
+                    .with_margin_right(CHIP_GAP)
+                    .with_margin_bottom(CHIP_GAP)
+                    .finish(),
+                );
+            }
+            group.add_child(
+                Container::new(chips.finish())
+                    .with_margin_top(6.)
+                    .finish(),
+            );
+        }
+
+        group.finish()
+    }
+
     fn render_list_mode(&self, appearance: &Appearance) -> Box<dyn Element> {
         let mut content = Flex::column()
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
@@ -194,6 +440,8 @@ impl QuickCredentialsPageView {
                 "Quick Credentials",
                 "Manage saved credentials for quick input.",
             ));
+
+        content.add_child(self.render_trigger_keywords_section(appearance));
 
         if self.credentials.is_empty() {
             content.add_child(
@@ -223,11 +471,6 @@ impl QuickCredentialsPageView {
                     .cloned()
                     .unwrap_or_default();
 
-                let send_mode_label = match credential.send_mode {
-                    SendMode::PasswordOnly => "Password Only",
-                    SendMode::UsernameThenPassword => "Username + Password",
-                };
-
                 let item = Flex::row()
                     .with_cross_axis_alignment(CrossAxisAlignment::Center)
                     .with_main_axis_size(MainAxisSize::Max)
@@ -247,7 +490,7 @@ impl QuickCredentialsPageView {
                                 )
                                 .with_child(
                                     Text::new_inline(
-                                        format!("{} — {}", credential.username, send_mode_label),
+                                        credential.username.clone(),
                                         appearance.ui_font_family(),
                                         appearance.ui_font_size(),
                                     )
@@ -331,45 +574,11 @@ impl QuickCredentialsPageView {
             &self.label_editor,
         ));
 
-        let row = Flex::row()
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(
-                Expanded::new(1., render_field_with_editor_inner(
-                    appearance,
-                    "Username".to_string(),
-                    &self.username_editor,
-                )).finish(),
-            )
-            .with_child(
-                Container::new(
-                    Flex::column()
-                        .with_child(
-                            Text::new_inline(
-                                "Send Mode",
-                                appearance.ui_font_family(),
-                                appearance.ui_font_size(),
-                            )
-                            .with_color(appearance.theme().active_ui_text_color().into())
-                            .finish(),
-                        )
-                        .with_child(
-                            Container::new(
-                                ChildView::new(&self.send_mode_dropdown).finish(),
-                            )
-                            .with_margin_top(4.)
-                            .finish(),
-                        )
-                        .finish(),
-                )
-                .with_margin_left(FORM_ROW_GAP)
-                .finish(),
-            )
-            .finish();
-        content.add_child(
-            Container::new(row)
-                .with_margin_bottom(FORM_HALF_GAP)
-                .finish(),
-        );
+        content.add_child(render_field_with_editor(
+            appearance,
+            "Username".to_string(),
+            &self.username_editor,
+        ));
 
         content.add_child(render_field_with_editor(
             appearance,
@@ -383,7 +592,6 @@ impl QuickCredentialsPageView {
             &self.notes_editor,
         ));
 
-        // Save / Cancel buttons
         content.add_child(
             Container::new(
                 Flex::row()
@@ -425,7 +633,6 @@ impl QuickCredentialsPageView {
         content.finish()
     }
 
-
 }
 
 impl Entity for QuickCredentialsPageView {
@@ -443,13 +650,11 @@ impl TypedActionView for QuickCredentialsPageView {
                 self.edit_username = String::new();
                 self.edit_password = String::new();
                 self.edit_notes = String::new();
-                self.edit_send_mode = SendMode::PasswordOnly;
                 self.populate(
                     &QuickCredential {
                         id: String::new(),
                         label: String::new(),
                         username: String::new(),
-                        send_mode: SendMode::PasswordOnly,
                         notes: String::new(),
                         password: Default::default(),
                     },
@@ -481,7 +686,6 @@ impl TypedActionView for QuickCredentialsPageView {
                             id: String::new(),
                             label: std::mem::take(&mut self.edit_label),
                             username: std::mem::take(&mut self.edit_username),
-                            send_mode: self.edit_send_mode.clone(),
                             notes: std::mem::take(&mut self.edit_notes),
                             password: std::mem::take(&mut self.edit_password).into(),
                         };
@@ -492,7 +696,6 @@ impl TypedActionView for QuickCredentialsPageView {
                             id: credential_id.clone(),
                             label: std::mem::take(&mut self.edit_label),
                             username: std::mem::take(&mut self.edit_username),
-                            send_mode: self.edit_send_mode.clone(),
                             notes: std::mem::take(&mut self.edit_notes),
                             password: std::mem::take(&mut self.edit_password).into(),
                         };
@@ -543,11 +746,6 @@ impl TypedActionView for QuickCredentialsPageView {
                     });
                 }
             }
-            QuickCredentialsPageAction::SetSendMode(mode) => {
-                self.edit_send_mode = mode.clone();
-                self.sync_dropdown(ctx);
-                ctx.notify();
-            }
             QuickCredentialsPageAction::SetLabel(label) => {
                 self.edit_label = label.clone();
             }
@@ -562,6 +760,38 @@ impl TypedActionView for QuickCredentialsPageView {
             }
             QuickCredentialsPageAction::RefreshList => {
                 self.refresh_list();
+                ctx.notify();
+            }
+            QuickCredentialsPageAction::BeginAddKeyword(mode) => {
+                self.adding_keyword_mode = Some(*mode);
+                self.keyword_editor.update(ctx, |editor, ctx| {
+                    editor.clear_buffer(ctx);
+                });
+                ctx.notify();
+            }
+            QuickCredentialsPageAction::CommitAddKeyword => {
+                let keyword = self.keyword_editor.as_ref(ctx).buffer_text(ctx);
+                if !keyword.is_empty() {
+                    if let Some(mode) = self.adding_keyword_mode {
+                        report_if_error!(warp_quick_credential::add_rule(&keyword, mode));
+                    }
+                }
+                self.adding_keyword_mode = None;
+                self.refresh_rules();
+                ctx.notify();
+            }
+            QuickCredentialsPageAction::CancelAddKeyword => {
+                self.adding_keyword_mode = None;
+                ctx.notify();
+            }
+            QuickCredentialsPageAction::RemoveKeyword(rule_id) => {
+                report_if_error!(warp_quick_credential::remove_rule(rule_id));
+                self.refresh_rules();
+                ctx.notify();
+            }
+            QuickCredentialsPageAction::ResetKeywords => {
+                report_if_error!(warp_quick_credential::reset_rules_to_defaults());
+                self.refresh_rules();
                 ctx.notify();
             }
         }
@@ -602,6 +832,10 @@ impl SettingsPageMeta for QuickCredentialsPageView {
 
 fn load_credentials() -> Vec<QuickCredential> {
     warp_quick_credential::find_all().unwrap_or_default()
+}
+
+fn load_rules() -> Vec<PromptTriggerRule> {
+    warp_quick_credential::list_rules().unwrap_or_default()
 }
 
 fn build_editor(

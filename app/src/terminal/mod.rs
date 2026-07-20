@@ -88,6 +88,8 @@ pub use cli_agent::CLIAgent;
 pub(crate) mod cli_agent_sessions;
 
 #[cfg(feature = "quick_credential_input")]
+pub mod prompt_detection;
+#[cfg(feature = "quick_credential_input")]
 pub mod quick_credential_sender;
 
 pub use mock_terminal_manager::MockTerminalManager;
