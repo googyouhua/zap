@@ -7,6 +7,7 @@ use warpui::{
         ParentElement, Radius, Text,
     },
     fonts::{Properties, Weight},
+    modals::{AlertDialogWithCallbacks, ModalButton},
     ui_components::{
         button::ButtonVariant,
         components::{Coords, UiComponent, UiComponentStyles},
@@ -27,7 +28,6 @@ use crate::editor::{EditorView, SingleLineEditorOptions, TextOptions};
 use crate::report_if_error;
 use crate::view_components::dropdown::{Dropdown, DropdownItem};
 
-const DELETE_CONFIRMATION_ID: &str = "quick_credential_delete_confirmation";
 const FORM_HALF_GAP: f32 = 8.;
 const FORM_ROW_GAP: f32 = 16.;
 
@@ -38,8 +38,6 @@ pub enum QuickCredentialsPageAction {
     CancelForm,
     SaveForm,
     ShowDeleteConfirmation(String),
-    ConfirmDelete(String),
-    CancelDelete,
     SetSendMode(SendMode),
     SetLabel(String),
     SetUsername(String),
@@ -54,7 +52,6 @@ enum PageMode {
     List,
     AddForm,
     EditForm(String),
-    DeleteConfirmation(String),
 }
 
 pub struct QuickCredentialsPageView {
@@ -75,8 +72,6 @@ pub struct QuickCredentialsPageView {
     add_button_state: MouseStateHandle,
     save_button_state: MouseStateHandle,
     cancel_button_state: MouseStateHandle,
-    delete_confirm_button_state: MouseStateHandle,
-    delete_cancel_button_state: MouseStateHandle,
 }
 
 impl QuickCredentialsPageView {
@@ -129,8 +124,6 @@ impl QuickCredentialsPageView {
             add_button_state: MouseStateHandle::default(),
             save_button_state: MouseStateHandle::default(),
             cancel_button_state: MouseStateHandle::default(),
-            delete_confirm_button_state: MouseStateHandle::default(),
-            delete_cancel_button_state: MouseStateHandle::default(),
         };
 
         me.sync_dropdown(ctx);
@@ -432,83 +425,7 @@ impl QuickCredentialsPageView {
         content.finish()
     }
 
-    fn render_delete_confirmation(
-        &self,
-        credential_id: &str,
-        appearance: &Appearance,
-    ) -> Box<dyn Element> {
-        let id = credential_id.to_string();
-        let credential = self
-            .credentials
-            .iter()
-            .find(|c| c.id == id);
 
-        let label = credential
-            .map(|c| c.label.as_str())
-            .unwrap_or("Unknown");
-
-        let delete_state = self.delete_confirm_button_state.clone();
-        let cancel_state = self.delete_cancel_button_state.clone();
-
-        let content = Flex::column()
-            .with_cross_axis_alignment(CrossAxisAlignment::Start)
-            .with_child(
-                Text::new(
-                    format!("Are you sure you want to delete \"{}\"?", label),
-                    appearance.ui_font_family(),
-                    appearance.ui_font_body(),
-                )
-                .with_color(appearance.theme().active_ui_text_color().into())
-                .finish(),
-            )
-            .with_child(
-                Container::new(
-                    Flex::row()
-                        .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                        .with_child(
-                            appearance
-                                .ui_builder()
-                                .button(ButtonVariant::Error, delete_state)
-                                .with_text_label("Delete".to_string())
-                                .build()
-                                .on_click(move |ctx, _, _| {
-                                    ctx.dispatch_typed_action(
-                                        QuickCredentialsPageAction::ConfirmDelete(
-                                            id.clone(),
-                                        ),
-                                    );
-                                })
-                                .finish(),
-                        )
-                        .with_child(
-                            Container::new(
-                                appearance
-                                    .ui_builder()
-                                    .button(ButtonVariant::Text, cancel_state)
-                                    .with_text_label("Cancel".to_string())
-                                    .build()
-                                    .on_click(|ctx, _, _| {
-                                        ctx.dispatch_typed_action(
-                                            QuickCredentialsPageAction::CancelDelete,
-                                        );
-                                    })
-                                    .finish(),
-                            )
-                            .with_margin_left(6.)
-                            .finish(),
-                        )
-                        .finish(),
-                )
-                .with_margin_top(16.)
-                .finish(),
-            );
-
-        Container::new(content.finish())
-            .with_background(appearance.theme().surface_1())
-            .with_corner_radius(CornerRadius::with_all(Radius::Pixels(4.)))
-            .with_uniform_padding(16.)
-            .finish()
-    }
 }
 
 impl Entity for QuickCredentialsPageView {
@@ -588,18 +505,30 @@ impl TypedActionView for QuickCredentialsPageView {
                 ctx.notify();
             }
             QuickCredentialsPageAction::ShowDeleteConfirmation(credential_id) => {
-                self.mode = PageMode::DeleteConfirmation(credential_id.clone());
-                ctx.notify();
-            }
-            QuickCredentialsPageAction::ConfirmDelete(credential_id) => {
-                report_if_error!(warp_quick_credential::delete(credential_id));
-                self.mode = PageMode::List;
-                self.refresh_list();
-                ctx.notify();
-            }
-            QuickCredentialsPageAction::CancelDelete => {
-                self.mode = PageMode::List;
-                ctx.notify();
+                let id = credential_id.clone();
+                let label = self
+                    .credentials
+                    .iter()
+                    .find(|c| c.id == *credential_id)
+                    .map(|c| c.label.clone())
+                    .unwrap_or_default();
+                let dialog = AlertDialogWithCallbacks::for_view(
+                    format!("Delete \"{label}\"?"),
+                    "This action cannot be undone.",
+                    vec![
+                        ModalButton::for_view(
+                            "Delete",
+                            move |me: &mut QuickCredentialsPageView, ctx| {
+                                report_if_error!(warp_quick_credential::delete(&id));
+                                me.refresh_list();
+                                ctx.notify();
+                            },
+                        ),
+                        ModalButton::for_view("Cancel", |_, _| {}),
+                    ],
+                    |_, _| {},
+                );
+                ctx.show_native_platform_modal(dialog);
             }
             QuickCredentialsPageAction::SetSendMode(mode) => {
                 self.edit_send_mode = mode.clone();
@@ -770,16 +699,6 @@ impl SettingsWidget for QuickCredentialsWidget {
             PageMode::AddForm | PageMode::EditForm(_) => {
                 let is_edit = matches!(view.mode, PageMode::EditForm(_));
                 view.render_form_mode(is_edit, appearance)
-            }
-            PageMode::DeleteConfirmation(credential_id) => {
-                Flex::column()
-                    .with_child(view.render_list_mode(appearance))
-                    .with_child(
-                        Container::new(view.render_delete_confirmation(credential_id, appearance))
-                            .with_margin_top(12.)
-                            .finish(),
-                    )
-                    .finish()
             }
         }
     }
