@@ -77,9 +77,13 @@ pub struct QuickCredentialsPageView {
     trigger_rules: Vec<PromptTriggerRule>,
     adding_keyword_mode: Option<SendMode>,
     keyword_editor: ViewHandle<EditorView>,
-    add_keyword_button_states: HashMap<String, MouseStateHandle>,
     remove_keyword_button_states: HashMap<String, MouseStateHandle>,
-    reset_button_state: MouseStateHandle,
+    reset_password_state: MouseStateHandle,
+    reset_username_state: MouseStateHandle,
+    add_keyword_password_state: MouseStateHandle,
+    add_keyword_username_state: MouseStateHandle,
+    ok_keyword_state: MouseStateHandle,
+    cancel_keyword_state: MouseStateHandle,
 }
 
 impl QuickCredentialsPageView {
@@ -98,12 +102,8 @@ impl QuickCredentialsPageView {
         }
 
         let trigger_rules = load_or_init_rules();
-        let mut add_keyword_button_states = HashMap::new();
         let mut remove_keyword_button_states = HashMap::new();
         for r in &trigger_rules {
-            add_keyword_button_states
-                .entry(format!("add_{}", r.send_mode.as_str()))
-                .or_default();
             remove_keyword_button_states
                 .entry(r.id.clone())
                 .or_default();
@@ -128,9 +128,13 @@ impl QuickCredentialsPageView {
             trigger_rules,
             adding_keyword_mode: None,
             keyword_editor,
-            add_keyword_button_states,
             remove_keyword_button_states,
-            reset_button_state: MouseStateHandle::default(),
+            reset_password_state: MouseStateHandle::default(),
+            reset_username_state: MouseStateHandle::default(),
+            add_keyword_password_state: MouseStateHandle::default(),
+            add_keyword_username_state: MouseStateHandle::default(),
+            ok_keyword_state: MouseStateHandle::default(),
+            cancel_keyword_state: MouseStateHandle::default(),
         }
     }
 
@@ -179,12 +183,8 @@ impl QuickCredentialsPageView {
 
     fn refresh_rules(&mut self) {
         self.trigger_rules = load_rules();
-        self.add_keyword_button_states.clear();
         self.remove_keyword_button_states.clear();
         for r in &self.trigger_rules {
-            self.add_keyword_button_states
-                .entry(format!("add_{}", r.send_mode.as_str()))
-                .or_default();
             self.remove_keyword_button_states
                 .entry(r.id.clone())
                 .or_default();
@@ -220,7 +220,10 @@ impl QuickCredentialsPageView {
             &self.remove_keyword_button_states,
             &self.adding_keyword_mode,
             &self.keyword_editor,
-            &self.reset_button_state,
+            &self.add_keyword_password_state,
+            &self.ok_keyword_state,
+            &self.cancel_keyword_state,
+            &self.reset_password_state,
         ));
 
         section.add_child(Self::render_keyword_group(
@@ -231,7 +234,10 @@ impl QuickCredentialsPageView {
             &self.remove_keyword_button_states,
             &self.adding_keyword_mode,
             &self.keyword_editor,
-            &self.reset_button_state,
+            &self.add_keyword_username_state,
+            &self.ok_keyword_state,
+            &self.cancel_keyword_state,
+            &self.reset_username_state,
         ));
 
         Container::new(section.finish())
@@ -250,6 +256,9 @@ impl QuickCredentialsPageView {
         remove_keyword_button_states: &HashMap<String, MouseStateHandle>,
         adding_keyword_mode: &Option<SendMode>,
         keyword_editor: &ViewHandle<EditorView>,
+        add_button_state: &MouseStateHandle,
+        ok_button_state: &MouseStateHandle,
+        cancel_button_state: &MouseStateHandle,
         reset_button_state: &MouseStateHandle,
     ) -> Box<dyn Element> {
         let mut group = Flex::column()
@@ -257,7 +266,7 @@ impl QuickCredentialsPageView {
 
         let is_adding = adding_keyword_mode.map_or(false, |am| am == mode);
 
-        // header row: label + +Add button + (Reset button only on PasswordOnly group)
+        // header row: label + +Add button + Reset button
         let mut header = Flex::row()
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
@@ -280,7 +289,7 @@ impl QuickCredentialsPageView {
                 Container::new(
                     appearance
                         .ui_builder()
-                        .button(ButtonVariant::Accent, MouseStateHandle::default())
+                        .button(ButtonVariant::Accent, ok_button_state.clone())
                         .with_style(UiComponentStyles {
                             font_size: Some(appearance.ui_font_size()),
                             padding: Some(Coords::uniform(3.)),
@@ -302,7 +311,7 @@ impl QuickCredentialsPageView {
                 Container::new(
                     appearance
                         .ui_builder()
-                        .button(ButtonVariant::Text, MouseStateHandle::default())
+                        .button(ButtonVariant::Text, cancel_button_state.clone())
                         .with_style(UiComponentStyles {
                             font_size: Some(appearance.ui_font_size()),
                             padding: Some(Coords::uniform(3.)),
@@ -324,7 +333,7 @@ impl QuickCredentialsPageView {
             header.add_child(
                 appearance
                     .ui_builder()
-                    .button(ButtonVariant::Accent, MouseStateHandle::default())
+                    .button(ButtonVariant::Accent, add_button_state.clone())
                     .with_style(UiComponentStyles {
                         font_size: Some(appearance.ui_font_size()),
                         padding: Some(Coords::uniform(3.)),
