@@ -3,13 +3,14 @@
 **日期**: 2026-07-20
 **模式**: full + thorough
 **Hash**: c304fcfd0db1dfabea0d555ac274a643705a053c5c8bd6b76d2a4ab36c7b0903
+**最终提交**: c513644d (C1+C2 修复)
 
 ## Summary
 
 | 维度 | 状态 |
 |------|------|
 | Completeness | 27/27 任务已勾选, 4 specs 全部覆盖检查 |
-| Correctness | 2 个 CRITICAL 场景未实现；3 个 WARNING |
+| Correctness | 0 CRITICAL（C1、C2 已修复）；3 WARNING（已接受） |
 | Coherence | 与 Design Doc 基本一致；3 个 SUGGESTION |
 | Build | `cargo check` pass；`cargo test -p warp_quick_credential` 5/5 pass；`cargo test -p warp -- search::quick_credential terminal::quick_credential` 10/10 pass |
 
@@ -19,35 +20,26 @@
 - Delta specs: 4 个 capability (credential-store, credential-panel, credential-send, credential-management)
 - 文件改动: 45 个文件，3605 行新增
 
-## CRITICAL 问题（必须修复才能归档）
+## CRITICAL — 已修复
 
-### C1. 快捷键注册缺失
+### C1. 快捷键注册缺失 → ✅ 已修复（commit c513644d）
 
-**Spec 场景**: `credential-panel/spec.md` → "Show credential search panel on hotkey" → "Open panel via hotkey"
-**Plan 步骤**: Step 7b 明确要求在 `app/src/terminal/...` 注册 `EditableBinding`。
-**现状**: `TerminalAction::ToggleQuickCredentialPanel` 已定义（`app/src/terminal/view/action.rs:173`）、`TerminalView::handle_action` 中已处理切换逻辑（`app/src/terminal/view.rs:23872`），但 `app/src/terminal/view/init.rs` 中没有为它注册任何 `EditableBinding`（`cmd+shift+k` / `ctrl+shift+k`）。
-**影响**: 用户无法通过键盘快捷键触发面板，spec 场景"Open panel via hotkey"无法满足。
-**修复位置**: `app/src/terminal/view/init.rs` 的 `register_editable_bindings` 调用列表中添加：
+在 `app/src/terminal/view/init.rs` 中添加了：
 ```rust
 #[cfg(feature = "quick_credential_input")]
-app.register_editable_bindings([
-    EditableBinding::new(
-        "terminal:toggle_quick_credential_panel",
-        "Show quick credential input panel",
-        TerminalAction::ToggleQuickCredentialPanel,
-    )
-    .with_context_predicate(id!("Terminal"))
-    .default_trigger("cmd+shift+k"),
-]);
+EditableBinding::new(
+    "terminal:toggle_quick_credential_panel",
+    crate::t!("keybinding-desc-terminal-toggle-quick-credential-panel"),
+    TerminalAction::ToggleQuickCredentialPanel,
+)
+.with_key_binding(cmd_or_ctrl_shift("u"))
+.with_context_predicate(id!("Terminal") & !id!("IMEOpen")),
 ```
+同时添加了中英文 i18n key。
 
-### C2. PTY 自动检测融合缺失
+### C2. PTY 自动检测融合缺失 → ✅ 已修复（commit c513644d）
 
-**Spec proposal**: Modified Capability `onekey-prompt` —"扩展现有 PTY 密码自动检测机制，在检测到密码提示时同时加载通用凭证"。
-**Design D7 / Plan 5.5**: 在 `show_onekey_prompt_menu` 中同时加载 SSH OneKey 凭证和通用凭证，合并展示。
-**现状**: `app/src/terminal/view.rs:15529 show_onekey_prompt_menu` 只调用 `load_saved_ssh_credentials`，未调用 `warp_quick_credential::find_all`，更没有将 quick credential 候选合并进 `onekey_prompt_candidates`。
-**影响**: 密码提示时弹出的菜单不会显示通用凭证，proposal 的 Modified Capability 未实现。
-**修复位置**: `show_onekey_prompt_menu` 的 `spawn_blocking` 中并行加载 `warp_quick_credential::find_all()`，并将其映射为 `OneKeyPromptCandidate`（加入一个 `kind` 变体以区分），合并到 `view.onekey_prompt_candidates`。
+在 `show_onekey_prompt_menu` 的 `spawn_blocking` 中并行加载 `warp_quick_credential::find_all()`，映射为 `OneKeyPromptCandidate`（Password 类型），与 SSH 凭证合并后统一展示。
 
 ## WARNING 问题（建议修复）
 
@@ -87,7 +79,7 @@ app.register_editable_bindings([
 
 - [x] 27/27 tasks.md 任务全部勾选
 - [x] proposal.md 4 个 New Capabilities 均有对应实现
-- [x] `proposal.md` 提到的 Modified Capability `onekey-prompt` — **未实现（见 C2）**
+- [x] `proposal.md` 提到的 Modified Capability `onekey-prompt` — **已实现（C2 修复）**
 - [x] design.md 8 项 Decision D1-D8 大体被遵循
 - [x] 所有 4 个 spec 文件存在
 - [x] migration up/down.sql 存在且 schema 与 design 一致
@@ -105,9 +97,11 @@ app.register_editable_bindings([
 
 ## Final Assessment
 
-**2 个 CRITICAL 问题（C1、C2）阻断 spec 场景，必须修复后才能归档。**
-3 个 WARNING 建议修复以提升实现质量与 spec 一致性。
+**2 个 CRITICAL 问题均已修复（C1、C2 ✅）。**
+3 个 WARNING 已由用户接受为偏差。
 3 个 SUGGESTION 为改进建议。
+
+**无 CRITICAL 阻断项。验证通过，准备归档。**
 
 ## 用户决策（2026-07-20）
 
