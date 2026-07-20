@@ -47,7 +47,7 @@ pub enum QuickCredentialsPageAction {
     CommitAddKeyword,
     CancelAddKeyword,
     RemoveKeyword(String),
-    ResetKeywords,
+    ResetKeywords(SendMode),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -97,7 +97,7 @@ impl QuickCredentialsPageView {
             button_states.entry(format!("delete_{}", c.id)).or_default();
         }
 
-        let trigger_rules = load_rules();
+        let trigger_rules = load_or_init_rules();
         let mut add_keyword_button_states = HashMap::new();
         let mut remove_keyword_button_states = HashMap::new();
         for r in &trigger_rules {
@@ -339,7 +339,7 @@ impl QuickCredentialsPageView {
                     })
                     .finish(),
             );
-            if adding_keyword_mode.is_none() && group_label == "Only Password" {
+            if adding_keyword_mode.is_none() {
                 header.add_child(
                     Container::new(
                         appearance
@@ -352,9 +352,9 @@ impl QuickCredentialsPageView {
                             })
                             .with_text_label("Reset".to_string())
                             .build()
-                            .on_click(|ctx, _, _| {
+                            .on_click(move |ctx, _, _| {
                                 ctx.dispatch_typed_action(
-                                    QuickCredentialsPageAction::ResetKeywords,
+                                    QuickCredentialsPageAction::ResetKeywords(mode),
                                 );
                             })
                             .finish(),
@@ -789,8 +789,8 @@ impl TypedActionView for QuickCredentialsPageView {
                 self.refresh_rules();
                 ctx.notify();
             }
-            QuickCredentialsPageAction::ResetKeywords => {
-                report_if_error!(warp_quick_credential::reset_rules_to_defaults());
+            QuickCredentialsPageAction::ResetKeywords(mode) => {
+                report_if_error!(warp_quick_credential::reset_rules_for_mode(*mode));
                 self.refresh_rules();
                 ctx.notify();
             }
@@ -836,6 +836,16 @@ fn load_credentials() -> Vec<QuickCredential> {
 
 fn load_rules() -> Vec<PromptTriggerRule> {
     warp_quick_credential::list_rules().unwrap_or_default()
+}
+
+fn load_or_init_rules() -> Vec<PromptTriggerRule> {
+    let rules = load_rules();
+    if rules.is_empty() {
+        let _ = warp_quick_credential::reset_rules_to_defaults();
+        load_rules()
+    } else {
+        rules
+    }
 }
 
 fn build_editor(

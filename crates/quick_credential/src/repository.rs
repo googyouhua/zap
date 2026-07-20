@@ -188,6 +188,31 @@ pub fn remove_rule(rule_id: &str) -> Result<()> {
     })
 }
 
+pub fn reset_rules_for_mode(mode: SendMode) -> Result<()> {
+    db::with_conn(|conn| {
+        let mode_str = mode.as_str();
+        diesel::delete(prompt_trigger_rules::table.filter(
+            prompt_trigger_rules::send_mode.eq(mode_str),
+        ))
+        .execute(conn)?;
+        let keywords = match mode {
+            SendMode::PasswordOnly => DEFAULT_PASSWORD_ONLY_KEYWORDS,
+            SendMode::UsernameThenPassword => DEFAULT_USERNAME_AND_PASSWORD_KEYWORDS,
+        };
+        for kw in keywords {
+            let id = Uuid::new_v4().to_string();
+            diesel::insert_into(prompt_trigger_rules::table)
+                .values((
+                    prompt_trigger_rules::id.eq(&id),
+                    prompt_trigger_rules::keyword.eq(kw),
+                    prompt_trigger_rules::send_mode.eq(mode_str),
+                ))
+                .execute(conn)?;
+        }
+        Ok(())
+    })
+}
+
 pub fn reset_rules_to_defaults() -> Result<()> {
     db::with_conn(|conn| {
         conn.batch_execute("DELETE FROM prompt_trigger_rules")?;
