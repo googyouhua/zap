@@ -1,4 +1,4 @@
-CREATE TABLE quick_credentials (
+CREATE TABLE IF NOT EXISTS quick_credentials (
     id         TEXT PRIMARY KEY NOT NULL,
     label      TEXT NOT NULL,
     username   TEXT NOT NULL DEFAULT '',
