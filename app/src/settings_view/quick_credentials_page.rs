@@ -105,6 +105,10 @@ impl QuickCredentialsPageView {
         let notes_editor = build_editor(ctx, "Notes (optional)".to_string());
 
         let credentials = load_credentials();
+        let mut button_states = HashMap::new();
+        for c in &credentials {
+            button_states.entry(c.id.clone()).or_default();
+        }
 
         let me = Self {
             page: PageType::new_monolith(QuickCredentialsWidget::default(), None, false),
@@ -120,7 +124,7 @@ impl QuickCredentialsPageView {
             password_editor,
             notes_editor,
             send_mode_dropdown,
-            button_states: HashMap::new(),
+            button_states,
             add_button_state: MouseStateHandle::default(),
             save_button_state: MouseStateHandle::default(),
             cancel_button_state: MouseStateHandle::default(),
@@ -172,7 +176,14 @@ impl QuickCredentialsPageView {
 
     fn refresh_list(&mut self) {
         self.credentials = load_credentials();
-        self.button_states.clear();
+        self.button_states.retain(|k, _| {
+            self.credentials.iter().any(|c| c.id == *k)
+        });
+        for c in &self.credentials {
+            self.button_states
+                .entry(c.id.clone())
+                .or_default();
+        }
     }
 
     fn render_list_mode(&self, appearance: &Appearance) -> Box<dyn Element> {
