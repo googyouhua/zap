@@ -23,6 +23,29 @@ fn row_to_credential(
     }
 }
 
+fn resolve_password(row: &QuickCredentialRow) -> Result<Option<Zeroizing<String>>> {
+    match QuickCredentialSecretStore::get(&row.id) {
+        Ok(Some(p)) => return Ok(Some(p)),
+        Ok(None) => {}
+        Err(e) => log::warn!("keyring error for {}: {e}", row.id),
+    }
+    if !row.encrypted_password.is_empty() {
+        return Ok(Some(Zeroizing::new(row.encrypted_password.clone())));
+    }
+    Ok(None)
+}
+
+fn store_password(conn: &mut SqliteConnection, id: &str, password: &str) -> Result<()> {
+    match QuickCredentialSecretStore::set(id, password) {
+        Ok(()) => return Ok(()),
+        Err(e) => log::warn!("keyring write error for {id}: {e}, falling back to sqlite"),
+    }
+    diesel::update(quick_credentials::table.find(id))
+        .set(quick_credentials::encrypted_password.eq(password))
+        .execute(conn)?;
+    Ok(())
+}
+
 pub fn find_all() -> Result<Vec<QuickCredential>> {
     db::with_conn(|conn| {
         let rows: Vec<QuickCredentialRow> = quick_credentials::table
@@ -31,7 +54,7 @@ pub fn find_all() -> Result<Vec<QuickCredential>> {
 
         let mut credentials = Vec::new();
         for row in rows {
-            match QuickCredentialSecretStore::get(&row.id) {
+            match resolve_password(&row) {
                 Ok(Some(password)) => {
                     credentials.push(row_to_credential(row, password));
                 }
@@ -54,7 +77,7 @@ pub fn find_by_id(credential_id: &str) -> Result<Option<QuickCredential>> {
 
         match row {
             Some(row) => {
-                let password = QuickCredentialSecretStore::get(&row.id)?
+                let password = resolve_password(&row)?
                     .ok_or_else(|| anyhow!("secret not found for {}", row.id))?;
                 Ok(Some(row_to_credential(row, password)))
             }
@@ -80,7 +103,7 @@ pub fn create(credential: &QuickCredential) -> Result<QuickCredential> {
             ))
             .execute(conn)?;
 
-        QuickCredentialSecretStore::set(&id, &credential.password)?;
+        store_password(conn, &id, &credential.password)?;
 
         Ok(QuickCredential {
             id,
@@ -111,7 +134,7 @@ pub fn update(credential: &QuickCredential) -> Result<QuickCredential> {
             return Err(anyhow!("credential {} not found", credential.id));
         }
 
-        QuickCredentialSecretStore::set(&credential.id, &credential.password)?;
+        store_password(conn, &credential.id, &credential.password)?;
 
         Ok(credential.clone())
     })
@@ -126,8 +149,7 @@ pub fn delete(credential_id: &str) -> Result<()> {
             return Err(anyhow!("credential {credential_id} not found"));
         }
 
-        QuickCredentialSecretStore::delete(credential_id)?;
-
+        let _ = QuickCredentialSecretStore::delete(credential_id);
         Ok(())
     })
 }

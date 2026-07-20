@@ -1,13 +1,13 @@
 workflow: full
-phase: build
+phase: verify
 context_compression: off
 build_mode: subagent-driven-development
 build_pause: null
 subagent_dispatch: confirmed
 tdd_mode: tdd
-review_mode: null
+review_mode: standard
 isolation: worktree
-verify_mode: null
+verify_mode: full
 auto_transition: true
 base_ref: 85d8bec7504a2506327065477c6c4d9985c5d8fa
 design_doc: docs/superpowers/specs/2026-07-19-quick-credential-input-design.md

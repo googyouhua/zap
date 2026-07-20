@@ -1545,6 +1545,7 @@ pub struct QuickCredentialRow {
     pub username: String,
     pub send_mode: String,
     pub notes: String,
+    pub encrypted_password: String,
     pub created_at: String,
     pub updated_at: String,
 }

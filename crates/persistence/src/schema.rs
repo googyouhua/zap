@@ -374,6 +374,7 @@ diesel::table! {
         username -> Text,
         send_mode -> Text,
         notes -> Text,
+        encrypted_password -> Text,
         created_at -> Text,
         updated_at -> Text,
     }
