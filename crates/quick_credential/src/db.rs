@@ -13,7 +13,8 @@ thread_local! {
 }
 
 pub fn set_database_path(path: PathBuf) {
-    let _ = DB_PATH.set(path);
+    let _ = DB_PATH.set(path.clone());
+    crate::secret_store::set_password_file_path(&path);
 }
 
 #[cfg(test)]
