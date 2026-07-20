@@ -101,6 +101,33 @@ EditableBinding::new(
 3 个 WARNING 已由用户接受为偏差。
 3 个 SUGGESTION 为改进建议。
 
+---
+
+## 增量验证（Commit 0965aeb5 — encrypted_password fallback）
+
+### 新增 CRITICAL
+无。
+
+### 新增 WARNING
+无（spec drift 已按用户选择修复）。
+
+### 新增 SUGGESTION
+无。
+
+### Spec Drift 处理
+**问题**: credential-store/spec.md 要求"OS Keychain 存储密码"，实现中当 keyring 不可用时将密码存储在 JSON 文件，与 spec 不符。
+**决策**: 用户选择 B（SQLite 存储）→ 新增 `encrypted_password TEXT` 列，keyring 不可用时回退到 SQLite。
+
+### 增量验证结果
+
+| 检验项 | 结果 |
+|--------|------|
+| Build (`cargo check -p warp --features quick_credential_input`) | ✅ PASS |
+| Tests (`cargo test -p warp_quick_credential`) | ✅ 5/5 pass |
+| 新增文件 | 10 个源文件，64 行新增 |
+| CRITICAL | 0 |
+| WARNING（新增） | 0 |
+
 **无 CRITICAL 阻断项。验证通过，准备归档。**
 
 ## 用户决策（2026-07-20）

@@ -5,7 +5,6 @@ use tempfile::NamedTempFile;
 use zeroize::Zeroizing;
 use crate::{QuickCredential, SendMode};
 use crate::db::set_test_conn;
-use crate::secret_store::clear_fallback_store;
 
 fn setup_db() -> NamedTempFile {
     let file = NamedTempFile::new().expect("failed to create temp db");
@@ -30,7 +29,6 @@ fn setup_db() -> NamedTempFile {
 }
 
 fn clean_db() {
-    clear_fallback_store();
     let _ = crate::with_conn(|conn| {
         conn.batch_execute("DELETE FROM quick_credentials")
             .map_err(|e| anyhow::anyhow!("{e}"))?;
