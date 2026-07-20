@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use tempfile::NamedTempFile;
 use zeroize::Zeroizing;
-use crate::{QuickCredential, SendMode};
+use crate::QuickCredential;
 use crate::db::set_test_conn;
 
 fn setup_db() -> NamedTempFile {
@@ -17,7 +17,6 @@ fn setup_db() -> NamedTempFile {
             id                TEXT PRIMARY KEY NOT NULL,
             label             TEXT NOT NULL,
             username          TEXT NOT NULL DEFAULT '',
-            send_mode         TEXT NOT NULL DEFAULT 'password_only',
             notes             TEXT NOT NULL DEFAULT '',
             encrypted_password TEXT NOT NULL DEFAULT '',
             created_at        TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -41,7 +40,6 @@ fn test_cred(label: &str, username: &str, password: &str) -> QuickCredential {
         id: String::new(),
         label: label.into(),
         username: username.into(),
-        send_mode: SendMode::PasswordOnly,
         notes: String::new(),
         password: Zeroizing::new(password.into()),
     }

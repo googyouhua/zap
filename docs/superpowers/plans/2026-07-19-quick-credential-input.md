@@ -2,6 +2,7 @@
 change: quick-credential-input
 design-doc: docs/superpowers/specs/2026-07-19-quick-credential-input-design.md
 base-ref: 85d8bec7504a2506327065477c6c4d9985c5d8fa
+archived-with: 2026-07-20-quick-credential-input
 ---
 
 # Quick Credential Input — Implementation Plan

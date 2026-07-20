@@ -372,11 +372,18 @@ diesel::table! {
         id -> Text,
         label -> Text,
         username -> Text,
-        send_mode -> Text,
         notes -> Text,
         encrypted_password -> Text,
         created_at -> Text,
         updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    prompt_trigger_rules (id) {
+        id -> Text,
+        keyword -> Text,
+        send_mode -> Text,
     }
 }
 

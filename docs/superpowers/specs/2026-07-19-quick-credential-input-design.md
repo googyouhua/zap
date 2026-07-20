@@ -2,6 +2,8 @@
 comet_change: quick-credential-input
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-20-quick-credential-input
+status: final
 ---
 
 # Quick Credential Input — Technical Design
