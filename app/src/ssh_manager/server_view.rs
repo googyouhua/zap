@@ -36,6 +36,9 @@ use warp_ssh_manager::{
     SshNode, SshOneKeyCredential, SshRepository, SshSecretStore, SshSecretStoreError,
     SshServerInfo,
 };
+
+#[cfg(feature = "quick_credential_input")]
+use warp_quick_credential::QuickCredential;
 use zeroize::Zeroizing;
 
 const FIELD_LABEL_MARGIN_TOP: f32 = 6.0;
@@ -71,6 +74,8 @@ pub enum SshServerAction {
     SetManagedOneKeyKey,
     SaveManagedOneKeyCredential,
     DeleteManagedOneKeyCredential,
+    #[cfg(feature = "quick_credential_input")]
+    FillQuickCredential(Option<usize>),
 }
 
 /// 一次性显示在 Save 按钮上方/下方的状态标签。
@@ -145,6 +150,9 @@ pub struct SshServerView {
     current_group_id: Option<String>,
     /// 初始从 DB 读到的 parent_id,用于判断 save 时是否需要 move_node。
     original_parent_id: Option<String>,
+
+    #[cfg(feature = "quick_credential_input")]
+    quick_credentials: Vec<QuickCredential>,
 
     status: Option<StatusBanner>,
     connection_status: ConnectionStatus,
@@ -242,6 +250,8 @@ impl SshServerView {
             folders: Vec::new(),
             current_group_id: None,
             original_parent_id: None,
+            #[cfg(feature = "quick_credential_input")]
+            quick_credentials: Vec::new(),
             status: None,
             connection_status: ConnectionStatus::Unknown,
             latency_ms: None,
@@ -360,6 +370,11 @@ impl SshServerView {
                 self.original_parent_id = None;
                 self.current_group_id = None;
             }
+        }
+
+        #[cfg(feature = "quick_credential_input")]
+        {
+            self.quick_credentials = warp_quick_credential::find_all().unwrap_or_default();
         }
 
         // 把节点名 / server 字段写入 editor buffer
@@ -506,6 +521,25 @@ impl SshServerView {
                 credential.display_label(),
                 SshServerAction::SelectOneKeyCredential(Some(index)),
             ));
+        }
+
+        #[cfg(feature = "quick_credential_input")]
+        if !self.quick_credentials.is_empty() {
+            items.push(DropdownItem::new(
+                "Quick Credentials",
+                SshServerAction::SelectOneKeyCredential(None),
+            ));
+            for (index, cred) in self.quick_credentials.iter().enumerate() {
+                let label = if cred.username.is_empty() {
+                    cred.label.clone()
+                } else {
+                    format!("{} ({})", cred.label, cred.username)
+                };
+                items.push(DropdownItem::new(
+                    label,
+                    SshServerAction::FillQuickCredential(Some(index)),
+                ));
+            }
         }
 
         let selected_index = self
@@ -2039,6 +2073,15 @@ impl TypedActionView for SshServerView {
                 }
                 self.rebuild_onekey_credential_dropdown(ctx);
                 ctx.notify();
+            }
+            #[cfg(feature = "quick_credential_input")]
+            SshServerAction::FillQuickCredential(index) => {
+                let Some(i) = index else { return };
+                let Some(cred) = self.quick_credentials.get(*i) else { return };
+                ctx.clipboard()
+                    .write(warpui::clipboard::ClipboardContent::plain_text(
+                        format!("{}\n", *cred.password),
+                    ));
             }
         }
     }

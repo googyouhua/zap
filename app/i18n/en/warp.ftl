@@ -1950,6 +1950,7 @@ keybinding-desc-terminal-toggle-block-filter = Toggle block filter on selected o
 keybinding-desc-terminal-toggle-sticky-command-header = Toggle Sticky Command Header in Active Pane
 keybinding-desc-terminal-toggle-autoexecute-mode = Toggle Auto-execute Mode
 keybinding-desc-terminal-toggle-queue-next-prompt = Toggle Queue Next Prompt
+keybinding-desc-terminal-toggle-quick-credential-panel = Toggle Quick Credential Panel
 
 # Pane group bindings
 keybinding-desc-pane-group-close-current-session = Close Current Session

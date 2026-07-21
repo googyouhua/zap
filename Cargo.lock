@@ -14893,6 +14893,7 @@ dependencies = [
  "warp_logging",
  "warp_managed_secrets",
  "warp_multi_agent_api",
+ "warp_quick_credential",
  "warp_ripgrep",
  "warp_ssh_manager",
  "warp_terminal",
@@ -15239,6 +15240,22 @@ dependencies = [
  "prost-reflect-build",
  "prost-types",
  "regex",
+]
+
+[[package]]
+name = "warp_quick_credential"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "diesel",
+ "keyring",
+ "log",
+ "persistence",
+ "tempfile",
+ "uuid",
+ "warp_ssh_manager",
+ "zeroize",
 ]
 
 [[package]]
