@@ -5298,7 +5298,7 @@ impl TerminalView {
             }
             #[cfg(windows)]
             CLISubagentViewEvent::WindowsCtrlC => {
-                if should_forward_windows_ctrl_c {
+                if _should_forward_windows_ctrl_c {
                     self.ctrl_c(ctx);
                 }
             }
