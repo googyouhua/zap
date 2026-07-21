@@ -15549,6 +15549,7 @@ impl TerminalView {
                 #[cfg(feature = "quick_credential_input")]
                 let quick_creds = match warp_quick_credential::find_all() {
                     Ok(creds) => {
+                        log::info!("onekey: loaded {} quick credentials", creds.len());
                         for c in &creds {
                             let subtitle = if c.username.is_empty() {
                                 String::new()
@@ -15586,6 +15587,11 @@ impl TerminalView {
                     }
                     Err(e) => log::warn!("onekey: failed to load saved ssh credentials: {e:?}"),
                 }
+                log::info!(
+                    "onekey: total candidates={}, quick_creds={}",
+                    candidates.len(),
+                    quick_creds.len(),
+                );
                 (candidates, quick_creds, trigger_rules)
             })
                 .await
