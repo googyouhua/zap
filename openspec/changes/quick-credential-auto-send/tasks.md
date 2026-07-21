@@ -62,4 +62,4 @@
 - [x] 8.1 Update existing unit tests for data layer changes
 - [x] 8.2 Add unit tests for `classify_prompt()`
 - [x] 8.3 Run relevant tests (warp_quick_credential, prompt_detection, quick_credential_data_source, persistence all pass)
-- [ ] 8.4 Run `scripts/run` to manually verify auto-send behavior
+- [x] 8.4 Run `scripts/run` to manually verify auto-send behavior
