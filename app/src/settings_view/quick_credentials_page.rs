@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use warpui::{
     elements::{
-        ChildView, Container, CornerRadius, CrossAxisAlignment, Element,
+        ChildView, ConstrainedBox, Container, CornerRadius, CrossAxisAlignment, Element,
         Expanded, Flex, MainAxisSize, MouseStateHandle,
         ParentElement, Radius, Text,
     },
@@ -198,7 +198,7 @@ impl QuickCredentialsPageView {
         section.add_child(render_sub_header_with_description(
             appearance,
             "Auto-fill Trigger Keywords",
-            "When terminal output matches a keyword, the credential is auto-sent with the matching mode.",
+            "When terminal output matches a keyword (case-insensitive), the credential is auto-sent with the matching mode.",
         ));
 
         let password_only_rules: Vec<_> = self
@@ -281,9 +281,13 @@ impl QuickCredentialsPageView {
 
         if is_adding {
             header.add_child(
-                Container::new(ChildView::new(keyword_editor).finish())
-                    .with_margin_right(CHIP_GAP)
-                    .finish(),
+                Container::new(
+                        ConstrainedBox::new(ChildView::new(keyword_editor).finish())
+                        .with_width(200.)
+                        .finish(),
+                )
+                .with_margin_right(CHIP_GAP)
+                .finish(),
             );
             header.add_child(
                 Container::new(
