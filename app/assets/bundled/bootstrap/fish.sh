@@ -48,7 +48,7 @@ end
 function warp_send_json_message
     # Sends a message to the controlling terminal as a DSC control sequence.
     set -l escaped_json (warp_hex_encode_string "$argv")
-    if [ "$WARP_USING_WINDOWS_CON_PTY" = true ]
+    if [ "$WARP_USING_WINDOWS_CON_PTY" = true ] && [ -z "$SSH_CLIENT" ]
         echo -n "$OSC_START$DCS_JSON_MARKER$OSC_PARAM_SEPARATOR$escaped_json$OSC_END"
     else
         echo -n "$DCS_START$DCS_JSON_MARKER$escaped_json$DCS_END"
@@ -57,7 +57,7 @@ end
 
 function warp_maybe_send_reset_grid_osc
     # Note that $WARP_USING_WINDOWS_CON_PTY is set in the init shell script.
-    if [ "$WARP_USING_WINDOWS_CON_PTY" = true ]
+    if [ "$WARP_USING_WINDOWS_CON_PTY" = true ] && [ -z "$SSH_CLIENT" ]
         printf $RESET_GRID_OSC
     end
 end

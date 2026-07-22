@@ -84,7 +84,7 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
       # one of the bytes in JSON is 9c (ST) or other (CAN, SUB, ESC).
       local msg=$(warp_hex_encode_string "$1")
       # We send the InitShell hook via OSCs when on WSL and via DCSs otherwise.
-      if [ "$WARP_USING_WINDOWS_CON_PTY" = true ]; then
+      if [ "$WARP_USING_WINDOWS_CON_PTY" = true ] && [ -z "$SSH_CLIENT" ]; then
         printf $OSC_START$DCS_JSON_MARKER$OSC_PARAM_SEPARATOR$msg$OSC_END
       else
         printf "%b%b%s%b" $DCS_START $DCS_JSON_MARKER $msg $DCS_END
@@ -131,7 +131,7 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   fi
 
   warp_maybe_send_reset_grid_osc() {
-      if [ "$WARP_USING_WINDOWS_CON_PTY" = true ]; then
+      if [ "$WARP_USING_WINDOWS_CON_PTY" = true ] && [ -z "$SSH_CLIENT" ]; then
           printf $OSC_RESET_GRID
       fi
   }
