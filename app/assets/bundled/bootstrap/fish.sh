@@ -504,11 +504,18 @@ function warp_bootstrapped
     end
   end
 
-  set -l escaped_abbr (warp_escape_json (abbr --show))
-  set -l escaped_aliases (warp_escape_json (alias))
-  set -l env_var_names (warp_escape_json (set --names))
-  set -l function_names (warp_escape_json (functions -an))
-  set -l escaped_builtins (warp_escape_json (builtin -n))
+  set -l escaped_abbr ""
+  set -l escaped_aliases ""
+  set -l env_var_names ""
+  set -l function_names ""
+  set -l escaped_builtins ""
+  if test -z "$SSH_CLIENT"
+      set escaped_abbr (warp_escape_json (abbr --show))
+      set escaped_aliases (warp_escape_json (alias))
+      set env_var_names (warp_escape_json (set --names))
+      set function_names (warp_escape_json (functions -an))
+      set escaped_builtins (warp_escape_json (builtin -n))
+  end
   # Note "keywords" is set to an empty string since fish includes keywords as a
   # part of its builtins (e.g. "for", "while", etc.).
   set -l escaped_editor (warp_escape_json "$EDITOR")

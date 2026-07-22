@@ -1389,12 +1389,19 @@ esac
     local escaped_histfile="$(warp_escape_json $HISTFILE)"
 
     # The output of `alias` can include control characters that need to be escaped.
-    local escaped_aliases="$(warp_escape_json "`alias`")"
+    local escaped_aliases=""
     local escaped_abbrs=""
-    local env_var_names="$(warp_escape_json "`echo ${(k)parameters[(R)*export*]}`")"
-    local function_names="$(warp_escape_json "`builtin print -l -- ${(ok)functions}`")"
-    local escaped_builtins="$(warp_escape_json "`builtin print -l -- ${(ok)builtins}`")"
-    local escaped_keywords="$(warp_escape_json "`builtin print -l -- ${(ok)reswords}`")"
+    local env_var_names=""
+    local function_names=""
+    local escaped_builtins=""
+    local escaped_keywords=""
+    if [ -z "$SSH_CLIENT" ]; then
+        escaped_aliases="$(warp_escape_json "`alias`")"
+        env_var_names="$(warp_escape_json "`echo ${(k)parameters[(R)*export*]}`")"
+        function_names="$(warp_escape_json "`builtin print -l -- ${(ok)functions}`")"
+        escaped_builtins="$(warp_escape_json "`builtin print -l -- ${(ok)builtins}`")"
+        escaped_keywords="$(warp_escape_json "`builtin print -l -- ${(ok)reswords}`")"
+    fi
 
     local escaped_path="$(warp_escape_json "$PATH")"
 

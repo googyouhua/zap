@@ -1301,11 +1301,18 @@ esac
     shell_plugins=()
 
     function warp_bootstrapped () {
-        local aliases="`alias`"
-        local env_var_names="`compgen -e`"
-        local function_names="`compgen -A function`"
-        local builtins="`compgen -b`"
-        local keywords="`compgen -k`"
+        local aliases=""
+        local env_var_names=""
+        local function_names=""
+        local builtins=""
+        local keywords=""
+        if [ -z "$SSH_CLIENT" ]; then
+            aliases="`alias`"
+            env_var_names="`compgen -e`"
+            function_names="`compgen -A function`"
+            builtins="`compgen -b`"
+            keywords="`compgen -k`"
+        fi
         if [ "$WARP_IN_MSYS2" = false ]; then
           # Note that for now we don't support dynamically changing HISTFILE within a session.
           local escaped_histfile="$(warp_escape_json "$HISTFILE")"
