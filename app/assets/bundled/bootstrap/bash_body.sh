@@ -75,7 +75,7 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
         encoded_message=$(warp_hex_encode_string "$1")
         # We send the InitShell hook via OSCs when on WSL or MSYS2 or SSH from Windows and via DCSs otherwise.
         # Note that $WARP_USING_WINDOWS_CON_PTY is set in the init shell script.
-        if [ "$WARP_USING_WINDOWS_CON_PTY" = true ]; then
+        if [ "$WARP_USING_WINDOWS_CON_PTY" = true ] && [ -z "$SSH_CLIENT" ]; then
           printf $OSC_START$DCS_JSON_MARKER$OSC_PARAM_SEPARATOR$encoded_message$OSC_END
         else
           printf $DCS_START$DCS_JSON_MARKER$encoded_message$DCS_END
@@ -115,7 +115,7 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
     fi
 
     warp_maybe_send_reset_grid_osc () {
-        if [ "$WARP_USING_WINDOWS_CON_PTY" = true ]; then
+        if [ "$WARP_USING_WINDOWS_CON_PTY" = true ] && [ -z "$SSH_CLIENT" ]; then
             printf $RESET_GRID_OSC
         fi
     }
