@@ -1092,7 +1092,12 @@ impl Session {
     /// Note that we load executables post-bootstrap because we don't need an interactive, login shell
     /// to get them (unlike aliases, functions and env-vars). All we need is the user's $PATH var,
     /// which we have access to at this point.
-    pub async fn load_external_commands(&self) {
+     pub async fn load_external_commands(&self) {
+        // The `compgen -c` output must be sent through the PTY via an in-band
+        // generator command. The output can be very large (thousands of command
+        // names). When going through ConPTY's small buffer, the hex-encoded OSC
+        // payload is fragmented. Chunked transmission (OSC marker C) handles this.
+
         let (load_future, receiver) = (async {
             let shell = self.info.shell.clone();
             let external_commands = self.external_commands.clone();

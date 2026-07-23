@@ -28,6 +28,7 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
     # Printable characters received this OSC and OSC_END_GENERATOR_OUTPUT are parsed and handled as
     # output for an in-band command.
     OSC_START_GENERATOR_OUTPUT="$(printf '\e]9277;A\a')"
+    OSC_CHUNK_GENERATOR_OUTPUT="$(printf '\e]9277;C\a')"
 
     # OSC used to mark the end of in-band command output.
     #
@@ -198,7 +199,29 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
         eval "$command" 2>&1;
         echo -n ";$?";
       } | command -p od -An -v -tx1 | command -p tr -d ' \n')"
-      warp_send_generator_output_osc_pre_hex_encoded "$generator_output"
+      local hex="${generator_output#*;}"
+      local total_len="${#hex}"
+      if [ "$total_len" -le 3072 ]; then
+        warp_send_generator_output_osc_pre_hex_encoded "$generator_output"
+      else
+        # Chunked transmission to avoid ConPTY buffer fragmentation
+        local chunk_size=3000
+        local offset=0
+        local first_chunk=1
+        while [ "$offset" -lt "$total_len" ]; do
+          local chunk="${hex:$offset:$chunk_size}"
+          local chunk_len="${#chunk}"
+          if [ "$first_chunk" -eq 1 ]; then
+            printf "%b%i;%s" "$OSC_START_GENERATOR_OUTPUT" "$chunk_len" "$chunk"
+            first_chunk=0
+          else
+            printf "%b%i;%s" "$OSC_CHUNK_GENERATOR_OUTPUT" "$chunk_len" "$chunk"
+          fi
+          offset=$((offset + chunk_size))
+        done
+        printf "%b" "$OSC_END_GENERATOR_OUTPUT"
+        warp_maybe_send_reset_grid_osc
+      fi
     }
 
     # Runs the given command in the background, records its PID in

@@ -1,0 +1,14 @@
+{
+  "change": "refine-blurred-event",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "40cd8bfcf4fc21d531c02a0da1e62e2aa60bc4fac4e036f25488de3b91283bf3",
+  "files": [
+    { "path": "openspec/changes/refine-blurred-event/proposal.md", "sha256": "c531b8b7c2cf72db77e7e65cf13524369d64f2003f41bf8caaa280a0e93f468b" },
+    { "path": "openspec/changes/refine-blurred-event/design.md", "sha256": "72f1e00c256a07776f873e8a664b45c5c1becde1de83d61705ee69fcc2601d33" },
+    { "path": "openspec/changes/refine-blurred-event/tasks.md", "sha256": "b2531f4df520dab6d8f54de2a73d1342967ac5c5a2bd3873824dd6abdb165d65" },
+    { "path": "openspec/changes/refine-blurred-event/specs/blurred-event/spec.md", "sha256": "a9baa229f05e446f443bb582fc1036dbe152478196c7e88b2daa0adc20a0bebe" }
+  ]
+}
