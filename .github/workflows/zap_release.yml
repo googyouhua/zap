@@ -574,14 +574,13 @@ jobs:
           echo "One or more builds failed for push tag. Aborting release."
           exit 1
 
-      # workflow_dispatch 触发:根据 publish 输入决定是否发布
-      - name: Check publish flag (workflow_dispatch)
+      # workflow_dispatch 触发:publish=false 时跳过后续步骤,不报错
+      - name: Skip publish (workflow_dispatch)
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'true' }}
-        run: |
-          echo "Publish not requested. Skipping release creation."
-          exit 1
+        run: echo "Publish not requested. Skipping release creation."
 
       - name: Download all artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: dist
@@ -590,6 +589,7 @@ jobs:
       # release-body artifact 是给 GitHub Release 描述用的,不是要挂到 Release 资产列表的产物。
       # 提前从 dist/ 移到独立路径,避免 `files: dist/*` 把它当成 asset 上传。
       - name: Extract release body from artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
         shell: bash
         run: |
           mv dist/release-body.md ./release-body.md
@@ -597,10 +597,12 @@ jobs:
           cat ./release-body.md
 
       - name: List downloaded files
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
         run: ls -lh dist
         shell: bash
 
       - name: Create GitHub release with all assets
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
           name: ${{ needs.prepare_metadata.outputs.release_name }}
