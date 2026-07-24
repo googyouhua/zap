@@ -3098,7 +3098,8 @@ impl ansi::Handler for TerminalModel {
                 );
             }
             IsReceivingInBandCommandOutput::No => {
-                log::warn!("Received 'end_in_band_command_output_chunk' while not expecting in-band command output.");
+                log::warn!("Received 'end_in_band_command_output_chunk' while not expecting in-band command output. Auto-starting receiver to prevent further data loss.");
+                self.start_in_band_command_output();
             }
         }
     }
