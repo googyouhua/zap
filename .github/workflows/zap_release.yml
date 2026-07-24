@@ -559,25 +559,22 @@ jobs:
 
   publish_release:
     name: Publish GitHub Release
-    if: ${{ always() && !cancelled() }}
+    if: ${{ always() && !cancelled() && (github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true') }}
     runs-on: ubuntu-latest
+    # push tag 触发:所有 build job 必须成功才发布
+    # workflow_dispatch:按 publish 输入决定
     needs:
       - prepare_metadata
       - release_macos
       - release_windows
       - release_linux
     steps:
-      # push tag 触发:所有 build job 必须成功才发布
+      # push tag 触发:任一 build job 失败则终止
       - name: Verify all builds passed (push tag)
         if: ${{ github.event_name != 'workflow_dispatch' && (needs.release_macos.result != 'success' || needs.release_windows.result != 'success' || needs.release_linux.result != 'success') }}
         run: |
           echo "One or more builds failed for push tag. Aborting release."
           exit 1
-
-      # workflow_dispatch 触发:publish=false 时跳过后续步骤,不报错
-      - name: Skip publish (workflow_dispatch)
-        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'true' }}
-        run: echo "Publish not requested. Skipping release creation."
 
       - name: Download all artifacts
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
