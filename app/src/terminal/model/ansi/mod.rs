@@ -59,6 +59,7 @@ use super::terminal_model::TmuxInstallationState;
 /// 9277 spells out "WARP" on a dialpad :).
 const WARP_IN_BAND_GENERATOR_OSC_MARKER: &[u8] = b"9277";
 const WARP_IN_BAND_GENERATOR_START_BYTE: &[u8] = b"A";
+const WARP_IN_BAND_GENERATOR_CHUNK_BYTE: &[u8] = b"C";
 const WARP_IN_BAND_GENERATOR_END_BYTE: &[u8] = b"B";
 
 /// Marks an OSC that is used for messages containing shell hooks.
@@ -1079,6 +1080,9 @@ where
                 Some(&WARP_IN_BAND_GENERATOR_START_BYTE) => {
                     log::info!("Received a Zap OSC marker for starting in-band command output.");
                     self.handler.start_in_band_command_output();
+                }
+                Some(&WARP_IN_BAND_GENERATOR_CHUNK_BYTE) => {
+                    self.handler.end_in_band_command_output_chunk();
                 }
                 Some(&WARP_IN_BAND_GENERATOR_END_BYTE) => {
                     self.handler.end_in_band_command_output(true);

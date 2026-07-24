@@ -319,6 +319,8 @@ pub struct HistoryItem {
 enum IsReceivingInBandCommandOutput {
     Yes {
         output: InBandCommandOutputReceiver,
+        /// Hex data accumulated across chunks for the same generator command.
+        accumulated_hex: String,
     },
 
     /// PTY output should be handled normally.
@@ -2442,14 +2444,15 @@ impl ansi::Handler for TerminalModel {
         // TODO: we should figure out what it means to be simultaneously expecting
         // in-band command output and completions data, which is technically possible
         // with the current data structures.
-        if let IsReceivingInBandCommandOutput::Yes { output } =
+        if let IsReceivingInBandCommandOutput::Yes { output, .. } =
             &mut self.is_receiving_in_band_command_output
         {
-            let is_receiving_prompt_chars = self.block_list.active_block().is_receiving_prompt();
-            if !is_receiving_prompt_chars {
-                output.input(c);
-                return;
-            }
+            // Always capture in-band generator output regardless of prompt
+            // state.  On remote/SSH sessions the shell prompt can arrive
+            // before the generator's hex data, and the prompt-mode guard
+            // would cause all hex chars to be written to the grid (leaked).
+            output.input(c);
+            return;
         } else if let IsReceivingCompletionsOutput::Yes {
             pending: CompletionsShellData::Raw { output },
         } = &mut self.is_receiving_completions_output
@@ -2462,7 +2465,7 @@ impl ansi::Handler for TerminalModel {
     }
 
     fn goto(&mut self, row: VisibleRow, column: usize) {
-        if let IsReceivingInBandCommandOutput::Yes { output } =
+        if let IsReceivingInBandCommandOutput::Yes { output, .. } =
             &mut self.is_receiving_in_band_command_output
         {
             output.goto(row.0, column);
@@ -3056,19 +3059,67 @@ impl ansi::Handler for TerminalModel {
             .active_block()
             .grid_handler()
             .cursor_point();
-        self.is_receiving_in_band_command_output = IsReceivingInBandCommandOutput::Yes {
-            output: InBandCommandOutputReceiver::new(
-                starting_cursor_point,
-                self.block_list().size(),
-            ),
-        };
+        let grid_size = *self.block_list().size();
+        match &mut self.is_receiving_in_band_command_output {
+            IsReceivingInBandCommandOutput::Yes { output, .. } => {
+                *output = InBandCommandOutputReceiver::new(
+                    starting_cursor_point,
+                    &grid_size,
+                );
+            }
+            IsReceivingInBandCommandOutput::No => {
+                self.is_receiving_in_band_command_output = IsReceivingInBandCommandOutput::Yes {
+                    output: InBandCommandOutputReceiver::new(
+                        starting_cursor_point,
+                        &grid_size,
+                    ),
+                    accumulated_hex: String::new(),
+                };
+            }
+        }
+    }
+
+    fn end_in_band_command_output_chunk(&mut self) {
+        let starting_cursor_point = self
+            .block_list()
+            .active_block()
+            .grid_handler()
+            .cursor_point();
+        let grid_size = *self.block_list().size();
+        match &mut self.is_receiving_in_band_command_output {
+            IsReceivingInBandCommandOutput::Yes { output, accumulated_hex } => {
+                let raw = output.as_str();
+                if let Some(hex_part) = raw.split_once(';').map(|(_, hex)| hex.trim()) {
+                    accumulated_hex.push_str(hex_part);
+                }
+                *output = InBandCommandOutputReceiver::new(
+                    starting_cursor_point,
+                    &grid_size,
+                );
+            }
+            IsReceivingInBandCommandOutput::No => {
+                log::warn!("Received 'end_in_band_command_output_chunk' while not expecting in-band command output. Auto-starting receiver to prevent further data loss.");
+                self.start_in_band_command_output();
+            }
+        }
     }
 
     #[cfg_attr(not(windows), allow(unused_variables))]
     fn end_in_band_command_output(&mut self, from_osc_sequence: bool) {
+        let raw_chunk = match &self.is_receiving_in_band_command_output {
+            IsReceivingInBandCommandOutput::Yes { output, .. } => output.as_str().to_string(),
+            IsReceivingInBandCommandOutput::No => String::new(),
+        };
         match &mut self.is_receiving_in_band_command_output {
-            IsReceivingInBandCommandOutput::Yes { output } => {
-                match validate_and_decode_in_band_command_output_to_bytes(output.as_str()) {
+            IsReceivingInBandCommandOutput::Yes { output, accumulated_hex } => {
+                if let Some(last_hex) = raw_chunk.split_once(';').map(|(_, hex)| hex.trim()) {
+                    accumulated_hex.push_str(last_hex);
+                }
+                let total_hex = std::mem::take(accumulated_hex);
+                let content_length = total_hex.len();
+                let final_payload = format!("{content_length};{total_hex}");
+
+                match validate_and_decode_in_band_command_output_to_bytes(&final_payload) {
                     Ok(decoded_bytes) => {
                         match ExecutedExecutorCommandEvent::parse_generator_payload(decoded_bytes) {
                             Ok(event) => {

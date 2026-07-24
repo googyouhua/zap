@@ -315,6 +315,12 @@ pub trait Handler {
     /// Marks the end of the in-band command output payload.
     fn end_in_band_command_output(&mut self, _from_osc_sequence: bool) {}
 
+    /// Callback to handle an "in-band command output chunk" OSC.
+    ///
+    /// Like `end_in_band_command_output` but keeps the accumulator alive
+    /// for more chunks.
+    fn end_in_band_command_output_chunk(&mut self) {}
+
     /// Hook that gets called upon processing a chunk of input from the PTY.
     /// Implementors can use this to perform any extra, one-off, logic with the
     /// input after it's been parsed.

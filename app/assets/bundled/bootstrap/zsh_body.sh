@@ -36,6 +36,8 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # handled as output for an in-band command.
   OSC_END_GENERATOR_OUTPUT="$(printf '\e]9277;B\a')"
 
+  OSC_CHUNK_GENERATOR_OUTPUT="$(printf '\e]9277;C\a')"
+
   OSC_START="$(printf '\e]9278;')"
 
   OSC_END="$(printf '\a')"
@@ -179,7 +181,30 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
     # handling.
     raw_output=$(eval "$command" 2>&1)
     local exit_code=$?
-    warp_send_generator_output_osc "$command_id;$raw_output;$exit_code"
+    local hex_encoded_message=$(warp_hex_encode_string "$command_id;$raw_output;$exit_code")
+    local total_len=${#hex_encoded_message}
+    if [ "$total_len" -le 3072 ]; then
+      local byte_count=$(LC_ALL="C"; printf "${#hex_encoded_message}")
+      printf "%b%i;%s%b" $OSC_START_GENERATOR_OUTPUT $byte_count $hex_encoded_message $OSC_END_GENERATOR_OUTPUT
+      warp_maybe_send_reset_grid_osc
+    else
+      local chunk_size=3000
+      local offset=1
+      local first_chunk=1
+      while [ "$offset" -le "$total_len" ]; do
+        local chunk="${hex_encoded_message[$offset,$((offset+chunk_size-1))]}"
+        local chunk_len=$(( ${#chunk} ))
+        if [ "$first_chunk" -eq 1 ]; then
+          printf "%b%i;%s" "$OSC_START_GENERATOR_OUTPUT" "$chunk_len" "$chunk"
+          first_chunk=0
+        else
+          printf "%b%i;%s" "$OSC_CHUNK_GENERATOR_OUTPUT" "$chunk_len" "$chunk"
+        fi
+        offset=$((offset + chunk_size))
+      done
+      printf "%b" "$OSC_END_GENERATOR_OUTPUT"
+      warp_maybe_send_reset_grid_osc
+    fi
   }
 
   # Runs the given command in the background, records its PID in
@@ -1389,21 +1414,40 @@ esac
     local escaped_histfile="$(warp_escape_json $HISTFILE)"
 
     # The output of `alias` can include control characters that need to be escaped.
-    local escaped_aliases="$(warp_escape_json "`alias`")"
+    local escaped_aliases=""
     local escaped_abbrs=""
-    local env_var_names="$(warp_escape_json "`echo ${(k)parameters[(R)*export*]}`")"
-    local function_names="$(warp_escape_json "`builtin print -l -- ${(ok)functions}`")"
-    local escaped_builtins="$(warp_escape_json "`builtin print -l -- ${(ok)builtins}`")"
-    local escaped_keywords="$(warp_escape_json "`builtin print -l -- ${(ok)reswords}`")"
+    local env_var_names=""
+    local function_names=""
+    local escaped_builtins=""
+    local escaped_keywords=""
+    if [ -z "$SSH_CLIENT" ]; then
+        escaped_aliases="$(warp_escape_json "`alias`")"
+        env_var_names="$(warp_escape_json "`echo ${(k)parameters[(R)*export*]}`")"
+        function_names="$(warp_escape_json "`builtin print -l -- ${(ok)functions}`")"
+        escaped_builtins="$(warp_escape_json "`builtin print -l -- ${(ok)builtins}`")"
+        escaped_keywords="$(warp_escape_json "`builtin print -l -- ${(ok)reswords}`")"
+    fi
 
     local escaped_path="$(warp_escape_json "$PATH")"
+    if [ -n "$SSH_CLIENT" ]; then
+        escaped_path="$(warp_escape_json "${PATH:0:256}")"
+    fi
 
-    local escaped_shell_plugins="$(warp_escape_json "`builtin print -l -- ${shell_plugins}`")"
+    local escaped_shell_plugins=""
+    if [ -z "$SSH_CLIENT" ]; then
+        escaped_shell_plugins="$(warp_escape_json "`builtin print -l -- ${shell_plugins}`")"
+    fi
 
     # The list of options enabled for the current shell.
-    local shell_options="$(warp_escape_json "`setopt`")"
+    local shell_options=""
+    if [ -z "$SSH_CLIENT" ]; then
+        shell_options="$(warp_escape_json "`setopt`")"
+    fi
 
-    local escaped_editor="$(warp_escape_json "$EDITOR")"
+    local escaped_editor=""
+    if [ -z "$SSH_CLIENT" ]; then
+        escaped_editor="$(warp_escape_json "$EDITOR")"
+    fi
     local escaped_shell_path="$(warp_escape_json "${commands[zsh]}")"
     local escaped_json="{\"hook\": \"Bootstrapped\", \"value\": {\"histfile\": \"$escaped_histfile\", \"shell\": \"zsh\", \"home_dir\": \"$HOME\", \"path\": \"$escaped_path\", \"editor\": \"$escaped_editor\", \"env_var_names\":  \"$env_var_names\", \"abbreviations\": \"$escaped_abbrs\", \"aliases\": \"$escaped_aliases\", \"function_names\": \"$function_names\",  \"builtins\": \"$escaped_builtins\",  \"keywords\": \"$escaped_keywords\", \"shell_version\": \"$ZSH_VERSION\", \"shell_options\": \"$shell_options\", \"rcfiles_start_time\": \"$rcfiles_start_time\", \"rcfiles_end_time\": \"$rcfiles_end_time\", \"shell_plugins\": \"$escaped_shell_plugins\", \"os_category\": \"$os_category\", \"linux_distribution\": \"$linux_distribution\", \"wsl_name\": \"${WSL_DISTRO_NAME:-}\", \"shell_path\": \"$escaped_shell_path\"}}"
     warp_send_json_message "$escaped_json"

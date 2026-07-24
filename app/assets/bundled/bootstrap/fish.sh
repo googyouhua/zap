@@ -109,6 +109,7 @@ function  _warp_run_generator_command_internal
         end
         set -l OSC_START_GENERATOR_OUTPUT \$(printf '\e]9277;A\a')
         set -l OSC_END_GENERATOR_OUTPUT \$(printf '\e]9277;B\a')
+        set -l OSC_CHUNK_GENERATOR_OUTPUT \$(printf '\e]9277;C\a')
         set -l command_id $command_id;
         set -l command $command;
         set -l IFS;
@@ -117,10 +118,29 @@ function  _warp_run_generator_command_internal
           eval \$command 2>&1
           echo -n \";\$status\"
         end | od -An -v -tx1 | command tr -d ' \n' | read -lz hex_encoded_message
-        set -l LC_ALL \"C\"
-        set -l byte_count (string length \"\$hex_encoded_message\")
-        echo -n \"\$OSC_START_GENERATOR_OUTPUT\$byte_count;\$hex_encoded_message\$OSC_END_GENERATOR_OUTPUT\"
-        warp_maybe_send_reset_grid_osc" 2> /dev/null &
+        set -l total_len (string length \"\$hex_encoded_message\")
+        if [ \"\$total_len\" -le 3072 ]
+            set -l byte_count \$total_len
+            echo -n \"\$OSC_START_GENERATOR_OUTPUT\$byte_count;\$hex_encoded_message\$OSC_END_GENERATOR_OUTPUT\"
+            warp_maybe_send_reset_grid_osc
+        else
+            set -l chunk_size 3000
+            set -l offset 1
+            set -l first_chunk 1
+            while [ \"\$offset\" -le \"\$total_len\" ]
+                set -l chunk (string sub --start \$offset --length \$chunk_size \"\$hex_encoded_message\")
+                set -l chunk_len (string length \"\$chunk\")
+                if [ \"\$first_chunk\" -eq 1 ]
+                    echo -n \"\$OSC_START_GENERATOR_OUTPUT\$chunk_len;\$chunk\"
+                    set first_chunk 0
+                else
+                    echo -n \"\$OSC_CHUNK_GENERATOR_OUTPUT\$chunk_len;\$chunk\"
+                end
+                set offset (math \$offset + \$chunk_size)
+            end
+            echo -n \"\$OSC_END_GENERATOR_OUTPUT\"
+            warp_maybe_send_reset_grid_osc
+        end" 2> /dev/null &
         
     set -l command_pid $last_pid
     set -a _warp_generator_pids $command_pid
@@ -504,16 +524,30 @@ function warp_bootstrapped
     end
   end
 
-  set -l escaped_abbr (warp_escape_json (abbr --show))
-  set -l escaped_aliases (warp_escape_json (alias))
-  set -l env_var_names (warp_escape_json (set --names))
-  set -l function_names (warp_escape_json (functions -an))
-  set -l escaped_builtins (warp_escape_json (builtin -n))
+  set -l escaped_abbr ""
+  set -l escaped_aliases ""
+  set -l env_var_names ""
+  set -l function_names ""
+  set -l escaped_builtins ""
+  if test -z "$SSH_CLIENT"
+      set escaped_abbr (warp_escape_json (abbr --show))
+      set escaped_aliases (warp_escape_json (alias))
+      set env_var_names (warp_escape_json (set --names))
+      set function_names (warp_escape_json (functions -an))
+      set escaped_builtins (warp_escape_json (builtin -n))
+  end
   # Note "keywords" is set to an empty string since fish includes keywords as a
   # part of its builtins (e.g. "for", "while", etc.).
-  set -l escaped_editor (warp_escape_json "$EDITOR")
+  set -l _path "$PATH"
+  if set -q SSH_CLIENT
+      set _path (string sub -l 256 "$PATH")
+  end
+  set -l escaped_editor ""
+  if not set -q SSH_CLIENT
+      set escaped_editor (warp_escape_json "$EDITOR")
+  end
   set -l escaped_shell_path (warp_escape_json (status fish-path))
-  set -l escaped_json "{\"hook\": \"Bootstrapped\", \"value\": {\"histfile\": \"$escaped_histfile\", \"shell\": \"fish\", \"home_dir\": \"$HOME\", \"path\": \"$PATH\", \"editor\": \"$escaped_editor\", \"abbreviations\": \"$escaped_abbr\", \"aliases\": \"$escaped_aliases\", \"function_names\": \"$function_names\", \"env_var_names\": \"$env_var_names\", \"builtins\": \"$escaped_builtins\", \"keywords\": \"\", \"shell_version\": \"$FISH_VERSION\", \"vi_mode_enabled\": \"$vi_mode_enabled\", \"os_category\": \"$os_category\", \"linux_distribution\": \"$linux_distribution\", \"wsl_name\": \"$WSL_DISTRO_NAME\", \"shell_path\": \"$escaped_shell_path\"}}"
+  set -l escaped_json "{\"hook\": \"Bootstrapped\", \"value\": {\"histfile\": \"$escaped_histfile\", \"shell\": \"fish\", \"home_dir\": \"$HOME\", \"path\": \"$_path\", \"editor\": \"$escaped_editor\", \"abbreviations\": \"$escaped_abbr\", \"aliases\": \"$escaped_aliases\", \"function_names\": \"$function_names\", \"env_var_names\": \"$env_var_names\", \"builtins\": \"$escaped_builtins\", \"keywords\": \"\", \"shell_version\": \"$FISH_VERSION\", \"vi_mode_enabled\": \"$vi_mode_enabled\", \"os_category\": \"$os_category\", \"linux_distribution\": \"$linux_distribution\", \"wsl_name\": \"$WSL_DISTRO_NAME\", \"shell_path\": \"$escaped_shell_path\"}}"
   warp_send_json_message $escaped_json
 end
 

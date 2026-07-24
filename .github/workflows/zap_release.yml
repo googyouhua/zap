@@ -5,7 +5,7 @@
 #   Web/CLI/Universal/Win-arm64 全砍
 #   (macOS 双架构分别产单架构 DMG 与 CLI tarball;Linux 产 AppImage/deb/rpm
 #    以及尽力而为的 Arch 包,不发布上游 Zap 仓库源或签名 key)
-# - 单 channel: preview(由 release_configurations.json 提供配置)
+# - 单 channel: oss(由 release_configurations.json 提供配置)
 # - 不签名:不传 --read-passwords-from-env(macOS) / 不设 SIGN_TOOL_CMD(Windows)
 # - 不上传 GCS / 第三方 crash 平台 / Slack / changelog,不调 channel-versions repository_dispatch
 # - 复用 ./.github/actions/{prepare_environment,get_channel_config}
@@ -14,6 +14,10 @@
 #   prepare_metadata → release_{macos,windows,linux} (上传成 workflow artifact)
 #                    → publish_release (全部 build 成功后下载 artifact 并创建 Release)
 # 任意 build job 失败 → publish_release 因 needs 跳过 → 不会留下没有安装包的 Release。
+#
+# workflow_dispatch 支持选择目标 OS 和是否发布:
+#   target_os: all / macos / windows / ubuntu
+#   publish: true / false
 
 name: Zap Release
 
@@ -24,6 +28,31 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      target_os:
+        description: 目标操作系统
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - macos
+          - windows
+          - linux
+      macos_arch:
+        description: macOS CPU 架构(仅 target_os=macos/all 时有效)
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - arm64
+          - amd64
+      publish:
+        description: 是否发布到 GitHub Release
+        required: true
+        default: true
+        type: boolean
 
 # 创建 release + 上传 asset 需要写权限。默认 GITHUB_TOKEN 在 fork/受限仓库下是只读,
 # 这里显式声明 contents: write 兜底 403 "Resource not accessible by integration"。
@@ -143,23 +172,38 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  determine_macos_matrix:
+    name: Determine macOS build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" || "${{ github.event.inputs.macos_arch }}" == "all" ]]; then
+            MATRIX='[{"arch":"aarch64","dmg_name_suffix":"arm64","runner":"macos-26"},{"arch":"x86_64","dmg_name_suffix":"intel","runner":"macos-26-intel"}]'
+          elif [[ "${{ github.event.inputs.macos_arch }}" == "arm64" ]]; then
+            MATRIX='[{"arch":"aarch64","dmg_name_suffix":"arm64","runner":"macos-26"}]'
+          else
+            MATRIX='[{"arch":"x86_64","dmg_name_suffix":"intel","runner":"macos-26-intel"}]'
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
   release_macos:
     name: Build Release (macOS ${{ matrix.dmg_name_suffix }})
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'macos' }}
     runs-on: ${{ matrix.runner }}
-    needs: prepare_metadata
+    needs:
+      - prepare_metadata
+      - determine_macos_matrix
     # macos-26 / macos-26-intel(Pro standard)无 sccache,full cargo build + bundle + create-dmg
     # 耗时高;Intel 构建历史上超过 180min,这里放宽到 GitHub-hosted job 6h 执行上限。
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: aarch64
-            dmg_name_suffix: arm64
-            runner: macos-26 # Pro standard arm64 (M2 Pro)
-          - arch: x86_64
-            dmg_name_suffix: intel
-            runner: macos-26-intel # Pro standard Intel
+        include: ${{ fromJSON(needs.determine_macos_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -246,6 +290,7 @@ jobs:
 
   release_windows:
     name: Build Release (Windows x64)
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'windows' }}
     runs-on: windows-latest
     needs: prepare_metadata
     timeout-minutes: 180
@@ -285,6 +330,7 @@ jobs:
 
   release_linux:
     name: Build Release (Linux x86_64)
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'linux' }}
     runs-on: ubuntu-22.04
     needs: prepare_metadata
     # 用 22.04 (glibc 2.35) 而不是 ubuntu-latest (24.04, glibc 2.39),
@@ -513,15 +559,28 @@ jobs:
 
   publish_release:
     name: Publish GitHub Release
+    if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
-    # 必须等所有平台都 build 成功才发布;任一失败 → 此 job 跳过 → 不会出现空 Release。
     needs:
       - prepare_metadata
       - release_macos
       - release_windows
       - release_linux
     steps:
+      # push tag 触发:所有 build job 必须成功才发布
+      - name: Verify all builds passed (push tag)
+        if: ${{ github.event_name != 'workflow_dispatch' && (needs.release_macos.result != 'success' || needs.release_windows.result != 'success' || needs.release_linux.result != 'success') }}
+        run: |
+          echo "One or more builds failed for push tag. Aborting release."
+          exit 1
+
+      # workflow_dispatch 触发:publish=false 时跳过后续步骤,不报错
+      - name: Skip publish (workflow_dispatch)
+        if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'true' }}
+        run: echo "Publish not requested. Skipping release creation."
+
       - name: Download all artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: dist
@@ -530,6 +589,7 @@ jobs:
       # release-body artifact 是给 GitHub Release 描述用的,不是要挂到 Release 资产列表的产物。
       # 提前从 dist/ 移到独立路径,避免 `files: dist/*` 把它当成 asset 上传。
       - name: Extract release body from artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
         shell: bash
         run: |
           mv dist/release-body.md ./release-body.md
@@ -537,10 +597,12 @@ jobs:
           cat ./release-body.md
 
       - name: List downloaded files
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
         run: ls -lh dist
         shell: bash
 
       - name: Create GitHub release with all assets
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.publish == 'true' }}
         uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2.2.2
         with:
           name: ${{ needs.prepare_metadata.outputs.release_name }}

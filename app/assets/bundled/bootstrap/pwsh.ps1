@@ -76,13 +76,34 @@ $null = New-Module -Name Warp-Module -ScriptBlock {
         # sequences for generator output.
         #
         # The payload of the OSC is "<content_length>;<hex-encoded content>".
+        # When the hex payload exceeds 3072 characters, it is split into chunks
+        # (OSC marker C) to avoid ConPTY buffer fragmentation.
         function Warp-Send-GeneratorOutputOsc {
             param([string]$message)
 
+            $oscChunkGeneratorOutput = "$([char]0x1b)]9277;C$oscEnd"
             $hexEncodedMessage = Warp-Encode-HexString $message
-            $byteCount = [System.Text.Encoding]::ASCII.GetByteCount($hexEncodedMessage)
-
-            Write-Host -NoNewline "$oscStartGeneratorOutput$byteCount;$hexEncodedMessage$oscEndGeneratorOutput"
+            $totalLen = $hexEncodedMessage.Length
+            if ($totalLen -le 3072) {
+                $byteCount = [System.Text.Encoding]::ASCII.GetByteCount($hexEncodedMessage)
+                Write-Host -NoNewline "$oscStartGeneratorOutput$byteCount;$hexEncodedMessage$oscEndGeneratorOutput"
+            } else {
+                $chunkSize = 3000
+                $offset = 0
+                $firstChunk = $true
+                while ($offset -lt $totalLen) {
+                    $chunkLen = [Math]::Min($chunkSize, $totalLen - $offset)
+                    $chunk = $hexEncodedMessage.Substring($offset, $chunkLen)
+                    if ($firstChunk) {
+                        Write-Host -NoNewline "${oscStartGeneratorOutput}${chunkLen};${chunk}"
+                        $firstChunk = $false
+                    } else {
+                        Write-Host -NoNewline "${oscChunkGeneratorOutput}${chunkLen};${chunk}"
+                    }
+                    $offset += $chunkSize
+                }
+                Write-Host -NoNewline "$oscEndGeneratorOutput"
+            }
             Warp-Send-ResetGridOSC
         }
 

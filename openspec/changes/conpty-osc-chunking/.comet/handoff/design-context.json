@@ -1,0 +1,14 @@
+{
+  "change": "conpty-osc-chunking",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "75c6c1fc40dd57f30d9f45f6fafe1934280547efa075f4db2bf7084237eb3805",
+  "files": [
+    { "path": "openspec/changes/conpty-osc-chunking/proposal.md", "sha256": "6341379de74c94fed967c2dc9669b85247f6ab033ff4a83dde194363024e7d1f" },
+    { "path": "openspec/changes/conpty-osc-chunking/design.md", "sha256": "5d2a233ca58c00e5968d30ed62fb2f927deef47c1e9145ce04e4a636a491f688" },
+    { "path": "openspec/changes/conpty-osc-chunking/tasks.md", "sha256": "b5ee4f929b8d600b926cd4675a4ff3d9fa6d6ae871965331aa50137b7fbf1ee4" },
+    { "path": "openspec/changes/conpty-osc-chunking/specs/in-band-output-chunking/spec.md", "sha256": "9709869a848bc91dc623d53f1577d3afbe8f29f9c40f578856710f99558c0e39" }
+  ]
+}
