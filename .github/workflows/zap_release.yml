@@ -174,7 +174,7 @@ jobs:
 
   release_macos:
     name: Build Release (macOS ${{ matrix.dmg_name_suffix }})
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'macos' }}
+    if: ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'macos') && (github.event_name != 'workflow_dispatch' || github.event.inputs.macos_arch == 'all' || (matrix.arch == 'aarch64' && github.event.inputs.macos_arch == 'arm64') || (matrix.arch == 'x86_64' && github.event.inputs.macos_arch == 'amd64')) }}
     runs-on: ${{ matrix.runner }}
     needs: prepare_metadata
     # macos-26 / macos-26-intel(Pro standard)无 sccache,full cargo build + bundle + create-dmg
@@ -183,7 +183,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: '${{ fromJSON(github.event_name != ''workflow_dispatch'' || github.event.inputs.macos_arch == ''all'' ? ''[{"arch":"aarch64","dmg_name_suffix":"arm64","runner":"macos-26"},{"arch":"x86_64","dmg_name_suffix":"intel","runner":"macos-26-intel"}]'' : github.event.inputs.macos_arch == ''arm64'' ? ''[{"arch":"aarch64","dmg_name_suffix":"arm64","runner":"macos-26"}]'' : ''[{"arch":"x86_64","dmg_name_suffix":"intel","runner":"macos-26-intel"}]'') }}'
+        include:
+          - arch: aarch64
+            dmg_name_suffix: arm64
+            runner: macos-26 # Pro standard arm64 (M2 Pro)
+          - arch: x86_64
+            dmg_name_suffix: intel
+            runner: macos-26-intel # Pro standard Intel
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
