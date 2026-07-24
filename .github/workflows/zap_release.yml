@@ -172,24 +172,38 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  determine_macos_matrix:
+    name: Determine macOS build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" || "${{ github.event.inputs.macos_arch }}" == "all" ]]; then
+            MATRIX='[{"arch":"aarch64","dmg_name_suffix":"arm64","runner":"macos-26"},{"arch":"x86_64","dmg_name_suffix":"intel","runner":"macos-26-intel"}]'
+          elif [[ "${{ github.event.inputs.macos_arch }}" == "arm64" ]]; then
+            MATRIX='[{"arch":"aarch64","dmg_name_suffix":"arm64","runner":"macos-26"}]'
+          else
+            MATRIX='[{"arch":"x86_64","dmg_name_suffix":"intel","runner":"macos-26-intel"}]'
+          fi
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+
   release_macos:
     name: Build Release (macOS ${{ matrix.dmg_name_suffix }})
-    if: ${{ (github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'macos') && (github.event_name != 'workflow_dispatch' || github.event.inputs.macos_arch == 'all' || (matrix.arch == 'aarch64' && github.event.inputs.macos_arch == 'arm64') || (matrix.arch == 'x86_64' && github.event.inputs.macos_arch == 'amd64')) }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'macos' }}
     runs-on: ${{ matrix.runner }}
-    needs: prepare_metadata
+    needs:
+      - prepare_metadata
+      - determine_macos_matrix
     # macos-26 / macos-26-intel(Pro standard)无 sccache,full cargo build + bundle + create-dmg
     # 耗时高;Intel 构建历史上超过 180min,这里放宽到 GitHub-hosted job 6h 执行上限。
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: aarch64
-            dmg_name_suffix: arm64
-            runner: macos-26 # Pro standard arm64 (M2 Pro)
-          - arch: x86_64
-            dmg_name_suffix: intel
-            runner: macos-26-intel # Pro standard Intel
+        include: ${{ fromJSON(needs.determine_macos_matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
