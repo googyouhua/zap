@@ -2447,11 +2447,12 @@ impl ansi::Handler for TerminalModel {
         if let IsReceivingInBandCommandOutput::Yes { output, .. } =
             &mut self.is_receiving_in_band_command_output
         {
-            let is_receiving_prompt_chars = self.block_list.active_block().is_receiving_prompt();
-            if !is_receiving_prompt_chars {
-                output.input(c);
-                return;
-            }
+            // Always capture in-band generator output regardless of prompt
+            // state.  On remote/SSH sessions the shell prompt can arrive
+            // before the generator's hex data, and the prompt-mode guard
+            // would cause all hex chars to be written to the grid (leaked).
+            output.input(c);
+            return;
         } else if let IsReceivingCompletionsOutput::Yes {
             pending: CompletionsShellData::Raw { output },
         } = &mut self.is_receiving_completions_output
