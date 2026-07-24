@@ -38,7 +38,7 @@ on:
           - all
           - macos
           - windows
-          - ubuntu
+          - linux
       macos_arch:
         description: macOS CPU 架构(仅 target_os=macos/all 时有效)
         required: true
@@ -330,7 +330,7 @@ jobs:
 
   release_linux:
     name: Build Release (Linux x86_64)
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'ubuntu' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'linux' }}
     runs-on: ubuntu-22.04
     needs: prepare_metadata
     # 用 22.04 (glibc 2.35) 而不是 ubuntu-latest (24.04, glibc 2.39),
