@@ -3061,11 +3061,12 @@ impl ansi::Handler for TerminalModel {
             .cursor_point();
         let grid_size = *self.block_list().size();
         match &mut self.is_receiving_in_band_command_output {
-            IsReceivingInBandCommandOutput::Yes { output, .. } => {
+            IsReceivingInBandCommandOutput::Yes { output, accumulated_hex } => {
                 *output = InBandCommandOutputReceiver::new(
                     starting_cursor_point,
                     &grid_size,
                 );
+                accumulated_hex.clear();
             }
             IsReceivingInBandCommandOutput::No => {
                 self.is_receiving_in_band_command_output = IsReceivingInBandCommandOutput::Yes {
@@ -3098,7 +3099,8 @@ impl ansi::Handler for TerminalModel {
                 );
             }
             IsReceivingInBandCommandOutput::No => {
-                log::warn!("Received 'end_in_band_command_output_chunk' while not expecting in-band command output.");
+                log::warn!("Received 'end_in_band_command_output_chunk' while not expecting in-band command output. Auto-starting receiver to prevent further data loss.");
+                self.start_in_band_command_output();
             }
         }
     }
