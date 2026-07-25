@@ -186,9 +186,6 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
     raw_output=$(eval "$command" 2>&1)
     local exit_code=$?
 
-    if [[ -z $_WARP_OSC_LOCK_DIR ]]; then
-      _WARP_OSC_LOCK_DIR="$(command -p mktemp -d)"
-    fi
     while ! command -p mkdir "$_WARP_OSC_LOCK_DIR/lock" 2>/dev/null; do
       command -p sleep 0.01
     done
@@ -249,6 +246,9 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   warp_run_generator_command() {
     _WARP_GENERATOR_COMMAND=1
 
+    if [[ -z $_WARP_OSC_LOCK_DIR ]]; then
+      _WARP_OSC_LOCK_DIR="$(command -p mktemp -d)"
+    fi
     if [[ -z $_WARP_GENERATOR_PIDS_STARTED_TMP_FILE || ! -f $_WARP_GENERATOR_PIDS_STARTED_TMP_FILE ]]; then
       _WARP_GENERATOR_PIDS_STARTED_TMP_FILE="$(command -p mktemp)"
     fi
