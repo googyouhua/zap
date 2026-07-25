@@ -166,40 +166,24 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
     # The payload of the OSC is "<content_length>;<hex-encoded content>".
     warp_send_generator_output_osc () {
         local hex_encoded_message=$(warp_hex_encode_string "$1")
-        warp_send_generator_output_osc_pre_hex_encoded "$hex_encoded_message"
-    }
-
-    # Note: If we're on windows, we send a reset grid to erase any cursor mutations caused by
-    # the in-band command.
-    warp_send_generator_output_osc_pre_hex_encoded () {
-        local byte_count=$(LC_ALL="C"; printf "${#1}")
-        printf "%b%i;%s%b" $OSC_START_GENERATOR_OUTPUT $byte_count $1 $OSC_END_GENERATOR_OUTPUT
+        # Put all hex payload inside the start OSC (no more chunking needed).
+        # The Rust side extracts the payload from params[2] directly.
+        printf '\e]9277;A;%s\a' "$hex_encoded_message"
+        printf '\e]9277;B\a'
         warp_maybe_send_reset_grid_osc
     }
 
-
     # Executes the given command and writes its output to the pty wrapped in a
-    # DCS.  The written DCS conforms to a basic schema including other metadata:
+    # OSC.  The written OSC conforms to a basic schema including other metadata:
     #   "<command_id>;<command_output>;<exit_code>"
     # where command_id is the ID given as the first argument to this function,
     # exit_code is the exit code of the executed command, and command_output is
     # the output itself.
     _warp_execute_command() {
       local command_id=$1
-      # This is shorthand to slice the 2nd-nth arguments of this function (i.e.
-      # the command array) into its own array. The first argument is the
-      # command_id stored above.
-      #
-      # This must be double-quoted to prevent bash word-splitting, which would effectively replace
-      # newlines and tabs with spaces, potentially invalidating the syntactical correctness of the
-      # command.
       local command="${@:2}"
-      # Bash cannot handle null characters in variables or command substitutions, so hex encode the
-      # output immediately before it's stored anywhere. This hex encoding must be done inline --
-      # bash doesn't like functions called with null bytes either.
       local generator_output="$( {
         echo -n "$command_id;";
-      # Command substitution only captures stdout, so redirect stderr to stdout.
         eval "$command" 2>&1;
         echo -n ";$?";
       } | command -p od -An -v -tx1 | command -p tr -d ' \n')"
@@ -207,28 +191,11 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
       while ! command -p mkdir "$_WARP_OSC_LOCK_DIR/lock" 2>/dev/null; do
         command -p sleep 0.01
       done
-      local hex="${generator_output#*;}"
-      local total_len="${#hex}"
-      if [ "$total_len" -le 3072 ]; then
-        warp_send_generator_output_osc_pre_hex_encoded "$generator_output"
-      else
-        local chunk_size=3000
-        local offset=0
-        local first_chunk=1
-        while [ "$offset" -lt "$total_len" ]; do
-          local chunk="${hex:$offset:$chunk_size}"
-          local chunk_len="${#chunk}"
-          if [ "$first_chunk" -eq 1 ]; then
-            printf "%b%i;%s" "$OSC_START_GENERATOR_OUTPUT" "$chunk_len" "$chunk"
-            first_chunk=0
-          else
-            printf "%b%i;%s" "$OSC_CHUNK_GENERATOR_OUTPUT" "$chunk_len" "$chunk"
-          fi
-          offset=$((offset + chunk_size))
-        done
-        printf "%b" "$OSC_END_GENERATOR_OUTPUT"
-        warp_maybe_send_reset_grid_osc
-      fi
+      # Put all hex payload inside the start OSC (no chunking needed).
+      # Rust extracts the hex from params[2] of the OSC 9277;A OSC.
+      printf '\e]9277;A;%s\a' "$generator_output"
+      printf '\e]9277;B\a'
+      warp_maybe_send_reset_grid_osc
       command -p rmdir "$_WARP_OSC_LOCK_DIR/lock" 2>/dev/null
     }
 

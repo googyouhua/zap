@@ -154,35 +154,24 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # the in-band command.
   warp_send_generator_output_osc() {
       local hex_encoded_message=$(warp_hex_encode_string "$1")
-      local byte_count=$(LC_ALL="C"; printf "${#hex_encoded_message}")
-      printf "%b%i;%s%b" $OSC_START_GENERATOR_OUTPUT $byte_count $hex_encoded_message $OSC_END_GENERATOR_OUTPUT
+      # Put all hex payload inside the start OSC (no more chunking needed).
+      # The Rust side extracts the payload from params[2] directly.
+      printf '\e]9277;A;%s\a' "$hex_encoded_message"
+      printf '\e]9277;B\a'
       warp_maybe_send_reset_grid_osc
   }
 
   # Executes the given command and writes its output to the pty wrapped in a
-  # DCS.  The written DCS conforms to a basic schema including other metadata:
+  # OSC.  The written OSC conforms to a basic schema including other metadata:
   #   "<command_id>;<command_output>;<exit_code>"
   # where command_id is the ID given as the first argument to this function,
   # exit_code is the exit code of the executed command, and command_output is
   # the output itself.
   _warp_execute_command() {
     local command_id=$1
-    # This is shorthand to slice the 2nd-nth arguments of this function (i.e.
-    # the command array) into its own array. The first argument is the
-    # command_id stored above. Zsh arrays are 1-indexed, hence slicing from
-    # index 2 rather than index 1.
     local -a command
     command=("${@:2}")
-    # Declare raw_output prior to actually assigning it, because `local` is a command itself, which
-    # interferes with capturing the exit code via $? (it overwrites $? with the 0, because the
-    # 'local' command always succeeds).
     local raw_output
-    # Command substitution only captures stdout, so redirect stderr to stdout.
-    # Note that we use `eval` here to actually execute the command, because some shell syntax
-    # that may be used in the command might not be valid in a command substitution (e.g. the
-    # '$(<command>)' syntax).
-    # Also note that zsh variables can contain null characters, so this doesn't require any special
-    # handling.
     raw_output=$(eval "$command" 2>&1)
     local exit_code=$?
 
@@ -190,29 +179,11 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
       command -p sleep 0.01
     done
     local hex_encoded_message=$(warp_hex_encode_string "$command_id;$raw_output;$exit_code")
-    local total_len=${#hex_encoded_message}
-    if [ "$total_len" -le 3072 ]; then
-      local byte_count=$(LC_ALL="C"; printf "${#hex_encoded_message}")
-      printf "%b%i;%s%b" $OSC_START_GENERATOR_OUTPUT $byte_count $hex_encoded_message $OSC_END_GENERATOR_OUTPUT
-      warp_maybe_send_reset_grid_osc
-    else
-      local chunk_size=3000
-      local offset=1
-      local first_chunk=1
-      while [ "$offset" -le "$total_len" ]; do
-        local chunk="${hex_encoded_message[$offset,$((offset+chunk_size-1))]}"
-        local chunk_len=$(( ${#chunk} ))
-        if [ "$first_chunk" -eq 1 ]; then
-          printf "%b%i;%s" "$OSC_START_GENERATOR_OUTPUT" "$chunk_len" "$chunk"
-          first_chunk=0
-        else
-          printf "%b%i;%s" "$OSC_CHUNK_GENERATOR_OUTPUT" "$chunk_len" "$chunk"
-        fi
-        offset=$((offset + chunk_size))
-      done
-      printf "%b" "$OSC_END_GENERATOR_OUTPUT"
-      warp_maybe_send_reset_grid_osc
-    fi
+    # Put all hex payload inside the start OSC (no chunking needed).
+    # Rust extracts the hex from params[2] of the OSC 9277;A OSC.
+    printf '\e]9277;A;%s\a' "$hex_encoded_message"
+    printf '\e]9277;B\a'
+    warp_maybe_send_reset_grid_osc
     command -p rmdir "$_WARP_OSC_LOCK_DIR/lock" 2>/dev/null
   }
 

@@ -107,9 +107,6 @@ function  _warp_run_generator_command_internal
                 printf \$reset_grid_osc
             end
         end
-        set -l OSC_START_GENERATOR_OUTPUT \$(printf '\e]9277;A\a')
-        set -l OSC_END_GENERATOR_OUTPUT \$(printf '\e]9277;B\a')
-        set -l OSC_CHUNK_GENERATOR_OUTPUT \$(printf '\e]9277;C\a')
         set -l command_id $command_id;
         set -l command $command;
         set -l IFS;
@@ -118,29 +115,11 @@ function  _warp_run_generator_command_internal
           eval \$command 2>&1
           echo -n \";\$status\"
         end | od -An -v -tx1 | command tr -d ' \n' | read -lz hex_encoded_message
-        set -l total_len (string length \"\$hex_encoded_message\")
-        if [ \"\$total_len\" -le 3072 ]
-            set -l byte_count \$total_len
-            echo -n \"\$OSC_START_GENERATOR_OUTPUT\$byte_count;\$hex_encoded_message\$OSC_END_GENERATOR_OUTPUT\"
-            warp_maybe_send_reset_grid_osc
-        else
-            set -l chunk_size 3000
-            set -l offset 1
-            set -l first_chunk 1
-            while [ \"\$offset\" -le \"\$total_len\" ]
-                set -l chunk (string sub --start \$offset --length \$chunk_size \"\$hex_encoded_message\")
-                set -l chunk_len (string length \"\$chunk\")
-                if [ \"\$first_chunk\" -eq 1 ]
-                    echo -n \"\$OSC_START_GENERATOR_OUTPUT\$chunk_len;\$chunk\"
-                    set first_chunk 0
-                else
-                    echo -n \"\$OSC_CHUNK_GENERATOR_OUTPUT\$chunk_len;\$chunk\"
-                end
-                set offset (math \$offset + \$chunk_size)
-            end
-            echo -n \"\$OSC_END_GENERATOR_OUTPUT\"
-            warp_maybe_send_reset_grid_osc
-        end" 2> /dev/null &
+        # Put all hex payload inside the start OSC (no chunking needed).
+        # Rust extracts the hex from params[2] of the OSC 9277;A OSC.
+        printf '\\e]9277;A;%s\\a' \$hex_encoded_message
+        printf '\\e]9277;B\\a'
+        warp_maybe_send_reset_grid_osc" 2> /dev/null &
         
     set -l command_pid $last_pid
     set -a _warp_generator_pids $command_pid

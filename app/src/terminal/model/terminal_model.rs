@@ -3089,6 +3089,26 @@ impl ansi::Handler for TerminalModel {
         }
     }
 
+    fn start_in_band_command_output_with_payload(&mut self, payload: String) {
+        log::info!(
+            "Received in-band command output start with payload of {} hex chars",
+            payload.len()
+        );
+        let starting_cursor_point = self
+            .block_list()
+            .active_block()
+            .grid_handler()
+            .cursor_point();
+        let grid_size = *self.block_list().size();
+        self.is_receiving_in_band_command_output = IsReceivingInBandCommandOutput::Yes {
+            output: InBandCommandOutputReceiver::new(
+                starting_cursor_point,
+                &grid_size,
+            ),
+            accumulated_hex: payload,
+        };
+    }
+
     fn end_in_band_command_output_chunk(&mut self) {
         let starting_cursor_point = self
             .block_list()
@@ -3110,6 +3130,21 @@ impl ansi::Handler for TerminalModel {
             IsReceivingInBandCommandOutput::No => {
                 log::warn!("Received 'end_in_band_command_output_chunk' while not expecting in-band command output. Auto-starting receiver to prevent further data loss.");
                 self.start_in_band_command_output();
+            }
+        }
+    }
+
+    fn end_in_band_command_output_chunk_with_payload(&mut self, payload: String) {
+        log::info!(
+            "Received in-band command output chunk with {} hex chars",
+            payload.len()
+        );
+        match &mut self.is_receiving_in_band_command_output {
+            IsReceivingInBandCommandOutput::Yes { accumulated_hex, .. } => {
+                accumulated_hex.push_str(&payload);
+            }
+            IsReceivingInBandCommandOutput::No => {
+                log::warn!("Received chunk with payload while not expecting in-band command output.");
             }
         }
     }

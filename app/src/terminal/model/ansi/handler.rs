@@ -310,6 +310,10 @@ pub trait Handler {
     /// Subsequent non-printable chars (e.g. control sequences) should be handled normally.
     fn start_in_band_command_output(&mut self) {}
 
+    /// Callback to handle an "in-band command output start" OSC
+    /// where the hex payload is already inside the OSC params.
+    fn start_in_band_command_output_with_payload(&mut self, _payload: String) {}
+
     /// Callback to handle an "in-band command output end" OSC.
     ///
     /// Marks the end of the in-band command output payload.
@@ -320,6 +324,10 @@ pub trait Handler {
     /// Like `end_in_band_command_output` but keeps the accumulator alive
     /// for more chunks.
     fn end_in_band_command_output_chunk(&mut self) {}
+
+    /// Callback to handle an "in-band command output chunk" OSC
+    /// where the hex payload is already inside the OSC params.
+    fn end_in_band_command_output_chunk_with_payload(&mut self, _payload: String) {}
 
     /// Hook that gets called upon processing a chunk of input from the PTY.
     /// Implementors can use this to perform any extra, one-off, logic with the
