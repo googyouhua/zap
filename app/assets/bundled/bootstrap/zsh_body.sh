@@ -207,32 +207,8 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
     fi
   }
 
-  # Runs the given command in the background, records its PID in
-  # _WARP_GENERATOR_PIDS_STARTED_TMP_FILE, and adds its PID from the file when
-  # the job is completed.
   _warp_run_generator_command_internal() {
-    _warp_execute_command "$@" &
-    # $! contains the PID of the most recently backgrounded command.
-    local pid=$!
-    echo $pid >> $_WARP_GENERATOR_PIDS_STARTED_TMP_FILE
-    wait $pid 2> /dev/null
-
-    # If the exit code of the backgrounded _warp_execute_command process is non-zero,
-    # the call to send the generator output failed (most likely because this is being
-    # executed in an old zsh version that doesn't support some syntax in
-    # _warp_execute_command function itself). In this case, send empty output with
-    # exit code 1 to indicate generator execution failed.
-    if [[ $? -ne 0 ]]; then
-        warp_send_generator_output_osc "$1;;1"
-    fi
-
-    # Add the PID to the completed generators PID file.
-    #
-    # The completed generator PIDs file may not exist if this generator was (by
-    # error) left running/not cancelled properly in warp_preexec.
-    if [[ -f $_WARP_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
-      echo $pid >> $_WARP_GENERATOR_PIDS_COMPLETED_TMP_FILE
-    fi
+    _warp_execute_command "$@"
   }
 
   # Executes a generator command in the background, where the first argument is
@@ -266,7 +242,7 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
     # not know when it finishes, which causes a variety of undesirable side-effects.
     precmd_functions=(${(M)precmd_functions:#*(warp|p9k)*})
 
-    (_warp_run_generator_command_internal "$@" &)
+    _warp_run_generator_command_internal "$@"
   }
 
   # Returns exit code 1 if the given argument starts with 'warp_run_generator_command'.
