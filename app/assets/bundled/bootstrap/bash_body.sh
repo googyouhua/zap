@@ -340,6 +340,10 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
             # PIDS are not running (which might rarely be the case due to race
             # conditions in checking which PIDS to cancel and this kill command.
             kill -9 $pids >/dev/null 2>/dev/null
+            # Close any in-progress OSC accumulation and in-band session
+            # so partial generator output does not leak to the terminal.
+            printf '\e\\\e]9277;B\a'
+            command -p rmdir "$_WARP_OSC_LOCK_DIR/lock" 2>/dev/null
           fi 
         fi
     }

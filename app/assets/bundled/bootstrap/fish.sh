@@ -189,6 +189,9 @@ function warp_preexec --on-event fish_preexec
             # PIDS are not running (which might rarely be the case due to race
             # conditions in checking which PIDS to cancel and this kill command.
             kill -9 $pids >/dev/null 2>/dev/null
+            # Close any in-progress OSC accumulation and in-band session
+            # so partial generator output does not leak to the terminal.
+            printf '\e\\\e]9277;B\a'
         end
         set -g _warp_generator_pids ''
     end

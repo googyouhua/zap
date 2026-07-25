@@ -2831,6 +2831,15 @@ impl ansi::Handler for TerminalModel {
     }
 
     fn preexec(&mut self, data: PreexecValue) {
+        if let IsReceivingInBandCommandOutput::Yes { accumulated_hex, .. } =
+            &self.is_receiving_in_band_command_output
+        {
+            log::warn!(
+                "preexec hook received while in-band session still open; \
+                 {} hex chars accumulated — generator was likely killed",
+                accumulated_hex.len()
+            );
+        }
         delegate!(self.preexec(data));
         self.emit_handler_event(HandlerEvent::Preexec);
     }
