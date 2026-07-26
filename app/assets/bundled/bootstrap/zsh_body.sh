@@ -24,19 +24,7 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # Byte used to signal the end of a DCS.
   DCS_END="$(printf '\x9c')"
 
-  # OSC used to mark the start of in-band command output.
-  #
-  # Printable characters received this OSC and OSC_END_GENERATOR_OUTPUT are parsed and handled as
-  # output for an in-band command.
-  OSC_START_GENERATOR_OUTPUT="$(printf '\e]9277;A\a')"
 
-  # OSC used to mark the end of in-band command output.
-  #
-  # Printable characters received between OSC_START_GENERATOR_OUTPUT and this are parsed and
-  # handled as output for an in-band command.
-  OSC_END_GENERATOR_OUTPUT="$(printf '\e]9277;B\a')"
-
-  OSC_CHUNK_GENERATOR_OUTPUT="$(printf '\e]9277;C\a')"
 
   OSC_START="$(printf '\e]9278;')"
 
