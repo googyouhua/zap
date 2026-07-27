@@ -23,6 +23,8 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
 
     RESET_GRID_OSC="$(printf '\e]9279\a')"
 
+    readonly OSC_IB_START=$'\e]9277;A;'
+    readonly OSC_IB_END=$'\e]9277;B\a'
 
     # Attempt to cd to the desired initial working directory, swallowing any
     # errors.  If this fails, the user will end up in their home directory.
@@ -154,10 +156,9 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
     # The payload of the OSC is "<content_length>;<hex-encoded content>".
     warp_send_generator_output_osc () {
         local hex_encoded_message=$(warp_hex_encode_string "$1")
-        local osc_start=$'\e]9277;A;' osc_end=$'\e]9277;B\a'
         # Put all hex payload inside the start OSC (no more chunking needed).
         # The Rust side extracts the payload from params[2] directly.
-        printf '%s%s%s' "$osc_start" "$hex_encoded_message" "$osc_end"
+        printf '%s%s%s' "$OSC_IB_START" "$hex_encoded_message" "$OSC_IB_END"
         warp_maybe_send_reset_grid_osc
     }
 
@@ -179,10 +180,9 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
       while ! command -p mkdir "$_WARP_OSC_LOCK_DIR/lock" 2>/dev/null; do
         command -p sleep 0.01
       done
-      local osc_start=$'\e]9277;A;' osc_end=$'\e]9277;B\a'
       # Put all hex payload inside the start OSC (no chunking needed).
       # Rust extracts the hex from params[2] of the OSC 9277;A OSC.
-      printf '%s%s%s' "$osc_start" "$generator_output" "$osc_end"
+      printf '%s%s%s' "$OSC_IB_START" "$generator_output" "$OSC_IB_END"
       warp_maybe_send_reset_grid_osc
       command -p rmdir "$_WARP_OSC_LOCK_DIR/lock" 2>/dev/null
     }

@@ -34,6 +34,9 @@ set -g OSC_PARAM_SEPARATOR ';'
 
 set -g RESET_GRID_OSC (printf '\e]9279\a')
 
+set -g OSC_IB_START (printf '\e]9277;A;')
+set -g OSC_IB_END (printf '\e]9277;B\a')
+
 if test -n "$WARP_INITIAL_WORKING_DIR"
     cd "$WARP_INITIAL_WORKING_DIR" >/dev/null 2>&1
     set -e WARP_INITIAL_WORKING_DIR
@@ -117,9 +120,7 @@ function  _warp_run_generator_command_internal
         end | od -An -v -tx1 | command tr -d ' \n' | read -lz hex_encoded_message
         # Put all hex payload inside the start OSC (no chunking needed).
         # Rust extracts the hex from params[2] of the OSC 9277;A OSC.
-        set -l osc_start (printf '\\e]9277;A;')
-        set -l osc_end (printf '\\e]9277;B\\a')
-        printf '%s%s%s' \$osc_start \$hex_encoded_message \$osc_end
+        printf '%s%s%s' \$OSC_IB_START \$hex_encoded_message \$OSC_IB_END
         warp_maybe_send_reset_grid_osc" 2> /dev/null &
         
     set -l command_pid $last_pid
