@@ -142,9 +142,10 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # the in-band command.
   warp_send_generator_output_osc() {
       local hex_encoded_message=$(warp_hex_encode_string "$1")
+      local osc_start=$'\e]9277;A;' osc_end=$'\e]9277;B\a'
       # Put all hex payload inside the start OSC (no more chunking needed).
       # The Rust side extracts the payload from params[2] directly.
-      printf '\e]9277;A;%s\a\e]9277;B\a' "$hex_encoded_message"
+      printf '%s%s%s' "$osc_start" "$hex_encoded_message" "$osc_end"
       warp_maybe_send_reset_grid_osc
   }
 
@@ -166,9 +167,10 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
       command -p sleep 0.01
     done
     local hex_encoded_message=$(warp_hex_encode_string "$command_id;$raw_output;$exit_code")
+    local osc_start=$'\e]9277;A;' osc_end=$'\e]9277;B\a'
     # Put all hex payload inside the start OSC (no chunking needed).
     # Rust extracts the hex from params[2] of the OSC 9277;A OSC.
-    printf '\e]9277;A;%s\a\e]9277;B\a' "$hex_encoded_message"
+    printf '%s%s%s' "$osc_start" "$hex_encoded_message" "$osc_end"
     warp_maybe_send_reset_grid_osc
     command -p rmdir "$_WARP_OSC_LOCK_DIR/lock" 2>/dev/null
   }

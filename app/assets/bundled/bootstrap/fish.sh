@@ -117,7 +117,9 @@ function  _warp_run_generator_command_internal
         end | od -An -v -tx1 | command tr -d ' \n' | read -lz hex_encoded_message
         # Put all hex payload inside the start OSC (no chunking needed).
         # Rust extracts the hex from params[2] of the OSC 9277;A OSC.
-        printf '\\e]9277;A;%s\\a\\e]9277;B\\a' \$hex_encoded_message
+        set -l osc_start (printf '\\e]9277;A;')
+        set -l osc_end (printf '\\e]9277;B\\a')
+        printf '%s%s%s' \$osc_start \$hex_encoded_message \$osc_end
         warp_maybe_send_reset_grid_osc" 2> /dev/null &
         
     set -l command_pid $last_pid
