@@ -1309,13 +1309,11 @@ esac
         local function_names=""
         local builtins=""
         local keywords=""
-        if [ -z "$SSH_CLIENT" ]; then
-            aliases="`alias`"
-            env_var_names="`compgen -e`"
-            function_names="`compgen -A function`"
-            builtins="`compgen -b`"
-            keywords="`compgen -k`"
-        fi
+        aliases="`alias`"
+        env_var_names="`compgen -e`"
+        function_names="`compgen -A function`"
+        builtins="`compgen -b`"
+        keywords="`compgen -k`"
         if [ "$WARP_IN_MSYS2" = false ]; then
           # Note that for now we don't support dynamically changing HISTFILE within a session.
           local escaped_histfile="$(warp_escape_json "$HISTFILE")"
@@ -1327,15 +1325,12 @@ esac
           local escaped_keywords="$(warp_escape_json "$keywords")"
         fi
 
-        local shell_options=""
-        if [ -z "$SSH_CLIENT" ]; then
-            shell_options="`shopt -s | command -p cut -f 1`"
-            # Provide terminal logic access to the value of HISTCONTROL via shell
-            # options.  Prefix the fake option with "!" to avoid conflicts with
-            # real bash options.
-            if [[ -n $USER_HISTCONTROL ]]; then
-                shell_options="$shell_options \n !histcontrol_$USER_HISTCONTROL"
-            fi
+        local shell_options="`shopt -s | command -p cut -f 1`"
+        # Provide terminal logic access to the value of HISTCONTROL via shell
+        # options.  Prefix the fake option with "!" to avoid conflicts with
+        # real bash options.
+        if [[ -n $USER_HISTCONTROL ]]; then
+            shell_options="$shell_options \n !histcontrol_$USER_HISTCONTROL"
         fi
 
         # Check if Starship is active for Bash. Note that another prompt could still be overriding Starship, however,
@@ -1345,15 +1340,9 @@ esac
         fi
 
         if [ "$WARP_IN_MSYS2" = false ]; then
-          local escaped_shell_plugins=""
+          local escaped_shell_plugins=$(warp_escape_json "$shell_plugins")
           local escaped_path="$(warp_escape_json "$PATH")"
-          local escaped_shell_options=""
-          if [ -z "$SSH_CLIENT" ]; then
-              escaped_shell_plugins=$(warp_escape_json "$shell_plugins")
-              escaped_shell_options=$(warp_escape_json "$shell_options")
-          else
-              escaped_path="$(warp_escape_json "${PATH:0:256}")"
-          fi
+          local escaped_shell_options=$(warp_escape_json "$shell_options")
         fi
 
         local _user=$(command -pv whoami >/dev/null 2>&1 && command -p whoami 2>/dev/null || echo $USER)
@@ -1385,10 +1374,7 @@ esac
           warp_send_hook_kv_pair "shell_path" "$BASH"
           warp_send_hook_via_kv_pairs_end
         else
-          local escaped_editor=""
-          if [ -z "$SSH_CLIENT" ]; then
-              escaped_editor="$(warp_escape_json "$EDITOR")"
-          fi
+          local escaped_editor="$(warp_escape_json "$EDITOR")"
           local escaped_shell_path="$(warp_escape_json "$BASH")"
           local escaped_json="{\"hook\": \"Bootstrapped\", \"value\": {\"histfile\": \"$escaped_histfile\", \"session_id\": $WARP_SESSION_ID, \"shell\": \"bash\",  \"home_dir\": \"$HOME\", \"user\":\"$_user\", \"host\":\"$_hostname\", \"path\": \"$escaped_path\", \"editor\": \"$escaped_editor\", \"env_var_names\": \"$escaped_env_var_names\", \"abbreviations\": \"$escaped_abbrs\", \"aliases\": \"$escaped_aliases\", \"function_names\": \"$escaped_function_names\", \"builtins\": \"$escaped_builtins\", \"keywords\": \"$escaped_keywords\", \"shell_version\": \"$BASH_VERSION\", \"shell_options\": \"$escaped_shell_options\", \"rcfiles_start_time\": \"$rcfiles_start_time\", \"rcfiles_end_time\": \"$rcfiles_end_time\", \"vi_mode_enabled\": \"$vi_mode_enabled\", \"os_category\": \"$os_category\", \"linux_distribution\": \"$linux_distribution\", \"wsl_name\": \"$WSL_DISTRO_NAME\", \"shell_path\": \"$escaped_shell_path\"}}"
           warp_send_json_message "$escaped_json"
