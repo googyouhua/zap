@@ -170,9 +170,20 @@ if [ -z "$WARP_BOOTSTRAPPED" ]; then
     # the output itself.
     _warp_execute_command() {
       local command_id=$1
+      # This is shorthand to slice the 2nd-nth arguments of this function (i.e.
+      # the command array) into its own array. The first argument is the
+      # command_id stored above.
+      #
+      # This must be double-quoted to prevent bash word-splitting, which would effectively replace
+      # newlines and tabs with spaces, potentially invalidating the syntactical correctness of the
+      # command.
       local command="${@:2}"
+      # Bash cannot handle null characters in variables or command substitutions, so hex encode the
+      # output immediately before it's stored anywhere. This hex encoding must be done inline --
+      # bash doesn't like functions called with null bytes either.
       local generator_output="$( {
         echo -n "$command_id;";
+      # Command substitution only captures stdout, so redirect stderr to stdout.
         eval "$command" 2>&1;
         echo -n ";$?";
       } | command -p od -An -v -tx1 | command -p tr -d ' \n')"

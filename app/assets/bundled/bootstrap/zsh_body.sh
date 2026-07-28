@@ -159,9 +159,22 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # the output itself.
   _warp_execute_command() {
     local command_id=$1
+    # This is shorthand to slice the 2nd-nth arguments of this function (i.e.
+    # the command array) into its own array. The first argument is the
+    # command_id stored above. Zsh arrays are 1-indexed, hence slicing from
+    # index 2 rather than index 1.
     local -a command
     command=("${@:2}")
+    # Declare raw_output prior to actually assigning it, because `local` is a command itself, which
+    # interferes with capturing the exit code via $? (it overwrites $? with the 0, because the
+    # 'local' command always succeeds).
     local raw_output
+    # Command substitution only captures stdout, so redirect stderr to stdout.
+    # Note that we use `eval` here to actually execute the command, because some shell syntax
+    # that may be used in the command might not be valid in a command substitution (e.g. the
+    # '$(<command>)' syntax).
+    # Also note that zsh variables can contain null characters, so this doesn't require any special
+    # handling.
     raw_output=$(eval "$command" 2>&1)
     local exit_code=$?
 
