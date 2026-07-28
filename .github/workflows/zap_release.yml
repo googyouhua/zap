@@ -28,14 +28,15 @@ on:
       target_os:
         description: Target OS
         required: true
-        default: "macos"
+        default: "all"
         type: choice
         options:
+          - all
           - macos
           - windows
           - linux
       macos_arch:
-        description: macOS architecture (only applies when target_os=macos)
+        description: macOS architecture (only applies when target_os=macos or target_os=all)
         required: true
         default: "all"
         type: choice
@@ -187,7 +188,7 @@ jobs:
 
   release_macos:
     name: Build Release (macOS ${{ matrix.dmg_name_suffix }})
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'macos' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'macos' }}
     runs-on: ${{ matrix.runner }}
     needs:
       - prepare_metadata
@@ -285,7 +286,7 @@ jobs:
 
   release_windows:
     name: Build Release (Windows x64)
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'windows' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'windows' }}
     runs-on: windows-latest
     needs: prepare_metadata
     timeout-minutes: 180
@@ -325,7 +326,7 @@ jobs:
 
   release_linux:
     name: Build Release (Linux x86_64)
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'linux' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target_os == 'all' || github.event.inputs.target_os == 'linux' }}
     runs-on: ubuntu-22.04
     needs: prepare_metadata
     # 用 22.04 (glibc 2.35) 而不是 ubuntu-latest (24.04, glibc 2.39),
