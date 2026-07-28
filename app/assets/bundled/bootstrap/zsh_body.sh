@@ -193,15 +193,28 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # _WARP_GENERATOR_PIDS_STARTED_TMP_FILE, and adds its PID from the file when
   # the job is completed.
   _warp_run_generator_command_internal() {
+    # $@ must be double-quoted to prevent word-splitting, which would cause the given command to
+    # be split into a list on $IFS chars (spaces, tabs, newlines), which could invalidate
+    # the syntactical correctness of the command.
     _warp_execute_command "$@" &
+    # $! contains the PID of the most recently backgrounded command.
     local pid=$!
     echo $pid >> $_WARP_GENERATOR_PIDS_STARTED_TMP_FILE
     wait $pid 2> /dev/null
 
+    # If the exit code of the backgrounded _warp_execute_command process is non-zero,
+    # the call to send the generator output failed (most likely because this is being
+    # executed in an old zsh version that doesn't support some syntax in
+    # _warp_execute_command function itself). In this case, send empty output with
+    # exit code 1 to indicate generator execution failed.
     if [[ $? -ne 0 ]]; then
         warp_send_generator_output_osc "$1;;1"
     fi
 
+    # Add the PID to the completed generators PID file.
+    #
+    # The completed generator PIDs file may not exist if this generator was (by
+    # error) left running/not cancelled properly in warp_preexec.
     if [[ -f $_WARP_GENERATOR_PIDS_COMPLETED_TMP_FILE ]]; then
       echo $pid >> $_WARP_GENERATOR_PIDS_COMPLETED_TMP_FILE
     fi
@@ -217,11 +230,14 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # Usage:
   #   warp_run_generator_command <command_id> '<command> <arg1> ... <argn>'
   warp_run_generator_command() {
+    # Setting this environment variable prevents warp_precmd from emitting the
+    # 'Block started' hook to the Rust app.
     _WARP_GENERATOR_COMMAND=1
 
     if [[ -z $_WARP_OSC_LOCK_DIR ]]; then
       _WARP_OSC_LOCK_DIR="$(command -p mktemp -d)"
     fi
+    # Ensure the started and completed generator PID files exist.
     if [[ -z $_WARP_GENERATOR_PIDS_STARTED_TMP_FILE || ! -f $_WARP_GENERATOR_PIDS_STARTED_TMP_FILE ]]; then
       _WARP_GENERATOR_PIDS_STARTED_TMP_FILE="$(command -p mktemp)"
     fi
@@ -229,7 +245,13 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
       _WARP_GENERATOR_PIDS_COMPLETED_TMP_FILE="$(command -p mktemp)"
     fi
 
+    # To minimize latency and prevent the user from being blocked from entering a command,
+    # cache the user's precmd_functions and only register warp_precmd. In the warp_precmd
+    # execution following this generator command, the user's precmd_functions are restored.
     _USER_PRECMD_FUNCTIONS=($precmd_functions)
+    # Remove all precmd functions other than ones defined by us or p10k.  If we remove the
+    # p10k precmd functions, p10k will see that we started running an in-band command but
+    # not know when it finishes, which causes a variety of undesirable side-effects.
     precmd_functions=(${(M)precmd_functions:#*(warp|p9k)*})
 
     (_warp_run_generator_command_internal "$@" &)
