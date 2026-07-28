@@ -107,8 +107,8 @@ function  _warp_run_generator_command_internal
                 printf \$reset_grid_osc
             end
         end
-        set -l OSC_START_GENERATOR_OUTPUT \$(printf '\e]9277;A\a')
-        set -l OSC_END_GENERATOR_OUTPUT \$(printf '\e]9277;B\a')
+        set -l OSC_IB_START \$(printf '\e]9277;A;')
+        set -l OSC_IB_END \$(printf '\a\e]9277;B\a')
         set -l command_id $command_id;
         set -l command $command;
         set -l IFS;
@@ -117,9 +117,7 @@ function  _warp_run_generator_command_internal
           eval \$command 2>&1
           echo -n \";\$status\"
         end | od -An -v -tx1 | command tr -d ' \n' | read -lz hex_encoded_message
-        set -l LC_ALL \"C\"
-        set -l byte_count (string length \"\$hex_encoded_message\")
-        echo -n \"\$OSC_START_GENERATOR_OUTPUT\$byte_count;\$hex_encoded_message\$OSC_END_GENERATOR_OUTPUT\"
+        echo -n \"\$OSC_IB_START\$hex_encoded_message\$OSC_IB_END\"
         warp_maybe_send_reset_grid_osc" 2> /dev/null &
         
     set -l command_pid $last_pid

@@ -319,6 +319,10 @@ pub struct HistoryItem {
 enum IsReceivingInBandCommandOutput {
     Yes {
         output: InBandCommandOutputReceiver,
+        /// When non-empty, the hex payload was received inline via the
+        /// `start_in_band_command_output_with_payload` handler (OSC params),
+        /// so `input()` should NOT capture PTY chars.
+        accumulated_hex: String,
     },
 
     /// PTY output should be handled normally.
@@ -2442,7 +2446,16 @@ impl ansi::Handler for TerminalModel {
         // TODO: we should figure out what it means to be simultaneously expecting
         // in-band command output and completions data, which is technically possible
         // with the current data structures.
-        if let IsReceivingInBandCommandOutput::Yes { output } =
+        let accumulated_hex_empty = matches!(
+            self.is_receiving_in_band_command_output,
+            IsReceivingInBandCommandOutput::Yes {
+                accumulated_hex: ref a,
+                ..
+            } if a.is_empty()
+        );
+        if !accumulated_hex_empty {
+            // New protocol: payload already in params, don't capture PTY chars
+        } else if let IsReceivingInBandCommandOutput::Yes { output, .. } =
             &mut self.is_receiving_in_band_command_output
         {
             let is_receiving_prompt_chars = self.block_list.active_block().is_receiving_prompt();
@@ -2462,11 +2475,15 @@ impl ansi::Handler for TerminalModel {
     }
 
     fn goto(&mut self, row: VisibleRow, column: usize) {
-        if let IsReceivingInBandCommandOutput::Yes { output } =
-            &mut self.is_receiving_in_band_command_output
+        if let IsReceivingInBandCommandOutput::Yes {
+            output,
+            accumulated_hex,
+        } = &mut self.is_receiving_in_band_command_output
         {
-            output.goto(row.0, column);
-            return;
+            if accumulated_hex.is_empty() {
+                output.goto(row.0, column);
+                return;
+            }
         }
         delegate!(self.goto(row, column));
     }
@@ -2528,11 +2545,15 @@ impl ansi::Handler for TerminalModel {
     }
 
     fn carriage_return(&mut self) {
-        if let IsReceivingInBandCommandOutput::Yes { output: cursor, .. } =
-            &mut self.is_receiving_in_band_command_output
+        if let IsReceivingInBandCommandOutput::Yes {
+            output: cursor,
+            accumulated_hex,
+        } = &mut self.is_receiving_in_band_command_output
         {
-            cursor.carriage_return();
-            return;
+            if accumulated_hex.is_empty() {
+                cursor.carriage_return();
+                return;
+            }
         }
         delegate!(self.carriage_return());
     }
@@ -3061,16 +3082,43 @@ impl ansi::Handler for TerminalModel {
                 starting_cursor_point,
                 self.block_list().size(),
             ),
+            accumulated_hex: String::new(),
+        };
+    }
+
+    fn start_in_band_command_output_with_payload(&mut self, payload: &str) {
+        let starting_cursor_point = self
+            .block_list()
+            .active_block()
+            .grid_handler()
+            .cursor_point();
+        self.is_receiving_in_band_command_output = IsReceivingInBandCommandOutput::Yes {
+            output: InBandCommandOutputReceiver::new(
+                starting_cursor_point,
+                self.block_list().size(),
+            ),
+            accumulated_hex: payload.to_string(),
         };
     }
 
     #[cfg_attr(not(windows), allow(unused_variables))]
     fn end_in_band_command_output(&mut self, from_osc_sequence: bool) {
         match &mut self.is_receiving_in_band_command_output {
-            IsReceivingInBandCommandOutput::Yes { output } => {
-                match validate_and_decode_in_band_command_output_to_bytes(output.as_str()) {
+            IsReceivingInBandCommandOutput::Yes {
+                output,
+                accumulated_hex,
+            } => {
+                let result = if accumulated_hex.is_empty() {
+                    validate_and_decode_in_band_command_output_to_bytes(output.as_str())
+                } else {
+                    hex::decode(&*accumulated_hex)
+                        .map_err(InBandCommandOutputDecodingError::HexDecodingFailure)
+                };
+                match result {
                     Ok(decoded_bytes) => {
-                        match ExecutedExecutorCommandEvent::parse_generator_payload(decoded_bytes) {
+                        match ExecutedExecutorCommandEvent::parse_generator_payload(
+                            decoded_bytes,
+                        ) {
                             Ok(event) => {
                                 log::info!(
                                     "Parsed generator output for command {}",

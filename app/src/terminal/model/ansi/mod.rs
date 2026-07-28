@@ -1078,7 +1078,13 @@ where
             WARP_IN_BAND_GENERATOR_OSC_MARKER => match params.get(1) {
                 Some(&WARP_IN_BAND_GENERATOR_START_BYTE) => {
                     log::info!("Received a Zap OSC marker for starting in-band command output.");
-                    self.handler.start_in_band_command_output();
+                    if let Some(payload_bytes) = params.get(2) {
+                        let payload = String::from_utf8_lossy(payload_bytes);
+                        self.handler
+                            .start_in_band_command_output_with_payload(&payload);
+                    } else {
+                        self.handler.start_in_band_command_output();
+                    }
                 }
                 Some(&WARP_IN_BAND_GENERATOR_END_BYTE) => {
                     self.handler.end_in_band_command_output(true);
