@@ -24,17 +24,11 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   # Byte used to signal the end of a DCS.
   DCS_END="$(printf '\x9c')"
 
-  # OSC used to mark the start of in-band command output.
-  #
-  # Printable characters received this OSC and OSC_END_GENERATOR_OUTPUT are parsed and handled as
-  # output for an in-band command.
-  OSC_START_GENERATOR_OUTPUT="$(printf '\e]9277;A\a')"
-
-  # OSC used to mark the end of in-band command output.
-  #
-  # Printable characters received between OSC_START_GENERATOR_OUTPUT and this are parsed and
-  # handled as output for an in-band command.
-  OSC_END_GENERATOR_OUTPUT="$(printf '\e]9277;B\a')"
+  # OSC used to start in-band command output with an inline hex payload.
+  # New ConPTY-safe protocol: the hex payload sits inside the OSC boundary
+  # (`<OSC_IB_START><hex><OSC_IB_END>`), so ConPTY never sees bare hex.
+  OSC_IB_START="$(printf '\e]9277;A;')"
+  OSC_IB_END="$(printf '\a\e]9277;B\a')"
 
   OSC_START="$(printf '\e]9278;')"
 
@@ -137,19 +131,16 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
   }
 
   # Hex-encodes the given argument and writes it to the PTY, wrapped in the OSC
-  # sequences for generator output.
+  # Write a pre-hex-encoded payload inside the ConPTY-safe OSC envelope.
   #
-  # Usage:
-  #   warp_send_generator_output_osc $my_output
-  #
-  # The payload of the OSC is "<content_length>;<hex-encoded content>".
-  #
-  # Note: If we're on windows, we send a reset grid to erase any cursor mutations caused by
-  # the in-band command.
+  # New protocol: `<OSC_IB_START><hex><OSC_IB_END>` — all hex is inside the
+  # OSC, so ConPTY never leaks it as printable text.
   warp_send_generator_output_osc() {
       local hex_encoded_message=$(warp_hex_encode_string "$1")
-      local byte_count=$(LC_ALL="C"; printf "${#hex_encoded_message}")
-      printf "%b%i;%s%b" $OSC_START_GENERATOR_OUTPUT $byte_count $hex_encoded_message $OSC_END_GENERATOR_OUTPUT
+      local lock_dir="/tmp/warp-generator-lock-$$"
+      command -p mkdir "$lock_dir" 2>/dev/null || return 1
+      printf '%s%s%s' "$OSC_IB_START" "$hex_encoded_message" "$OSC_IB_END"
+      command -p rmdir "$lock_dir"
       warp_maybe_send_reset_grid_osc
   }
 
@@ -281,6 +272,11 @@ if [[ -z $WARP_BOOTSTRAPPED ]]; then
           # PIDS are not running (which might rarely be the case due to race
           # conditions in checking which PIDS to cancel and this kill command.
           (kill -9 $pids 2>&1) >/dev/null
+
+          # Emergency cleanup: close any orphaned OSC session left by killed
+          # generators and remove stale lock directories.
+          printf '\e\\\e]9277;B\a'
+          command -p rmdir /tmp/warp-generator-lock-* 2>/dev/null
         fi
       fi
   }

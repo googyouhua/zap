@@ -310,6 +310,10 @@ pub trait Handler {
     /// Subsequent non-printable chars (e.g. control sequences) should be handled normally.
     fn start_in_band_command_output(&mut self) {}
 
+    /// Callback to handle an "in-band command output start" OSC with an inline
+    /// hex-encoded payload (ConPTY-safe protocol: `<OSC_9277;A;<hex>\a>`).
+    fn start_in_band_command_output_with_payload(&mut self, _payload: &str) {}
+
     /// Callback to handle an "in-band command output end" OSC.
     ///
     /// Marks the end of the in-band command output payload.

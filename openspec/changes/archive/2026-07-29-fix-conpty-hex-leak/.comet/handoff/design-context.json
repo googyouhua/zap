@@ -1,0 +1,14 @@
+{
+  "change": "fix-conpty-hex-leak",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "cf7a17f601aa54bf32790127a0a4f3c3737fe2c8e0cc05f0b45d3c78be1a4d2c",
+  "files": [
+    { "path": "openspec/changes/fix-conpty-hex-leak/proposal.md", "sha256": "5ae76269b3af16f093544245f6257b1955295616ebc02551a5d44471a14bd56b" },
+    { "path": "openspec/changes/fix-conpty-hex-leak/design.md", "sha256": "83c9ddcd4aef17a8308b9fb03898c872baa0443672385e8645da2d686d456e3d" },
+    { "path": "openspec/changes/fix-conpty-hex-leak/tasks.md", "sha256": "e9e89dbd2a2ef850aef8dab8c06fc1549047e5c86c0af287e8a8eeb5bffaaafb" },
+    { "path": "openspec/changes/fix-conpty-hex-leak/specs/generator-output/spec.md", "sha256": "1e8b8e3620f36beac10d3324785888326e7b2524790f08f9edd90dcaff235bbb" }
+  ]
+}
