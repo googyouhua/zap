@@ -17,6 +17,7 @@ default-members = [
   "crates/sum_tree",
   "crates/warpui",
   "crates/warp_completer",
+  "crates/quick_credential",
   "crates/warp_terminal",
   "crates/warp_util",
 ]
@@ -76,6 +77,7 @@ warp_isolation_platform = { path = "crates/isolation_platform" }
 warp_js = { path = "crates/warp_js" }
 warp_logging = { path = "crates/warp_logging" }
 warp_managed_secrets = { path = "crates/managed_secrets" }
+warp_quick_credential = { path = "crates/quick_credential" }
 warp_ripgrep = { path = "crates/warp_ripgrep" }
 warp_ssh_manager = { path = "crates/warp_ssh_manager" }
 warp_terminal = { path = "crates/warp_terminal" }

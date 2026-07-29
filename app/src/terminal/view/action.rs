@@ -169,6 +169,8 @@ pub enum TerminalAction {
     SuRootFillOneKeyPassword {
         index: usize,
     },
+    #[cfg(feature = "quick_credential_input")]
+    ToggleQuickCredentialPanel,
     Paste,
     Copy,
     CopyOutputs,
@@ -646,6 +648,8 @@ impl fmt::Debug for TerminalAction {
             RevealChildAgent { .. } => write!(f, "RevealChildAgent"),
             ToggleSessionRecording => write!(f, "ToggleSessionRecording"),
             OpenCLIAgentRichInput => write!(f, "OpenCLIAgentRichInput"),
+            #[cfg(feature = "quick_credential_input")]
+            ToggleQuickCredentialPanel => write!(f, "ToggleQuickCredentialPanel"),
         }
     }
 }

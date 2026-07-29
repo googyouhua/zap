@@ -368,6 +368,26 @@ diesel::table! {
 }
 
 diesel::table! {
+    quick_credentials (id) {
+        id -> Text,
+        label -> Text,
+        username -> Text,
+        notes -> Text,
+        encrypted_password -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    prompt_trigger_rules (id) {
+        id -> Text,
+        keyword -> Text,
+        send_mode -> Text,
+    }
+}
+
+diesel::table! {
     ssh_onekey_credentials (id) {
         id -> Text,
         label -> Text,

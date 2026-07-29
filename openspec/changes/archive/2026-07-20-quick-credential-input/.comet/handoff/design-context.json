@@ -1,0 +1,17 @@
+{
+  "change": "quick-credential-input",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "bb3bca61b91de1d1bf7e0449bcad8a9e1a0884ec71ca7d7cc15ff8106d9c49d9",
+  "files": [
+    { "path": "openspec/changes/quick-credential-input/proposal.md", "sha256": "cadb5b697e9531c4722afc1cd6940213e3c6d8d2afccdc167c915ba72625fa8f" },
+    { "path": "openspec/changes/quick-credential-input/design.md", "sha256": "6be529975197db19ffd44c8f8c6c61a8d7749da0abbbb24b829e5cb1b50e2c19" },
+    { "path": "openspec/changes/quick-credential-input/tasks.md", "sha256": "77f777d27f53644ddcd5b1ec64c0c724f7861a23270ffbbf634a41d18cc2c47b" },
+    { "path": "openspec/changes/quick-credential-input/specs/credential-management/spec.md", "sha256": "04343723fffa99d0770c1c67be93e7d68d0e441051da004b46f7c09420ef7567" },
+    { "path": "openspec/changes/quick-credential-input/specs/credential-panel/spec.md", "sha256": "7d3b7a5ca7b3389f7e63644760692096cb642b6e2f2a42d98bd2253af7a79099" },
+    { "path": "openspec/changes/quick-credential-input/specs/credential-send/spec.md", "sha256": "d1e4c2bde97dd3dc2986e4a9ee0c8b98b8d3cea880d63c06efb2bea2f0d5b837" },
+    { "path": "openspec/changes/quick-credential-input/specs/credential-store/spec.md", "sha256": "4c2a6686140810cf28d88e7350673e26756be4d0ebfd3f8a456676895ee6fbda" }
+  ]
+}

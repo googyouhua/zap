@@ -1080,6 +1080,7 @@ fn initialize_app(
     // 必须在 persistence::initialize 跑完 migration 之后才设路径,否则首个
     // SshManager 操作可能撞 missing-table。
     warp_ssh_manager::set_database_path(persistence::database_file_path());
+    warp_quick_credential::set_database_path(persistence::database_file_path());
 
     let persistence_writer = PersistenceWriter::new(writer_handles);
 
