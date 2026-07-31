@@ -10,9 +10,9 @@
 
 ## 2. Feature flag 与接线
 
-- [ ] 2.1 在 `app/Cargo.toml` 新增 `onekey_input` feature(默认启用),并确认与 `onekey_prompt` 并存
-- [ ] 2.2 `app/src/lib.rs` 中初始化 `warp_onekey::set_database_path(persistence::database_file_path())`
-- [ ] 2.3 确认 `FeatureFlag::OneKeyPrompt` 继续门控提示监听,不回归
+- [x] 2.1 在 `app/Cargo.toml` 新增 `onekey_input` feature(默认启用),并确认与 `onekey_prompt` 并存
+- [x] 2.2 `app/src/lib.rs` 中初始化 `warp_onekey::set_database_path(persistence::database_file_path())`
+- [x] 2.3 确认 `FeatureFlag::OneKeyPrompt` 继续门控提示监听,不回归
 
 ## 3. 终端搜索面板
 

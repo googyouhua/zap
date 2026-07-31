@@ -329,7 +329,7 @@ git commit -m "feat: 新建 warp_onekey 统一凭据存储层与干净迁移"
 
 REF: `.worktrees/feature/20260719/quick-credential-input/crates/warp_features/src/lib.rs`(`OneKeyInput` 变体 + `DOGFOOD_FLAGS`)、`app/Cargo.toml`(feature 声明)、`app/src/lib.rs:1082-1083,1512`。
 
-- [ ] **Step 2.1:新增 FeatureFlag::OneKeyInput**
+- [x] **Step 2.1:新增 FeatureFlag::OneKeyInput**
 
 在 `crates/warp_features/src/lib.rs` 的 `OneKeyPrompt` 变体(约 673 行)后追加(注释用简体中文,沿用 `OneKeyPrompt` 的中文注释风格):
 
@@ -341,7 +341,7 @@ OneKeyInput,
 
 并在 `DOGFOOD_FLAGS` 常量末尾追加 `FeatureFlag::OneKeyInput,`(参考分支 755 行)。
 
-- [ ] **Step 2.2:app/Cargo.toml 新增 onekey_input feature**
+- [x] **Step 2.2:app/Cargo.toml 新增 onekey_input feature**
 
 - 在 `[dependencies]` 区新增 `warp_onekey.workspace = true`(参考分支 207 行)。
 - 在 `default = [...]` 列表(现有约 576 行 `"onekey_prompt",` 之后)追加 `"onekey_input",`。
@@ -353,7 +353,7 @@ onekey_input = []
 
 确认与 `onekey_prompt` 并存(两个 feature 相互独立、互不依赖)。
 
-- [ ] **Step 2.3:app/src/lib.rs 初始化数据库路径**
+- [x] **Step 2.3:app/src/lib.rs 初始化数据库路径**
 
 在 `app/src/lib.rs:1082`(`warp_ssh_manager::set_database_path(persistence::database_file_path());`)之后追加一行:
 
@@ -361,7 +361,7 @@ onekey_input = []
 warp_onekey::set_database_path(persistence::database_file_path());
 ```
 
-- [ ] **Step 2.4:注册 notifier singleton(先建文件)**
+- [x] **Step 2.4:注册 notifier singleton(先建文件)**
 
 参考分支 `app/src/ssh_manager/onekey_notifier.rs` 逐字创建 `app/src/ssh_manager/onekey_notifier.rs`:
 
@@ -403,11 +403,11 @@ pub use onekey_notifier::{OneKeyCredentialsChangedEvent, OneKeyCredentialsChange
 ctx.add_singleton_model(|_| crate::ssh_manager::OneKeyCredentialsChangedNotifier::new());
 ```
 
-- [ ] **Step 2.5:确认 OneKeyPrompt 门控不回归**
+- [x] **Step 2.5:确认 OneKeyPrompt 门控不回归**
 
 核对(只读,不改):`app/src/terminal/view.rs:3769` 的 `FeatureFlag::OneKeyPrompt.is_enabled()` 仍包住 `spawn_onekey_prompt_listener` 调用;`app/src/lib.rs:2332` 的 `#[cfg(feature = "onekey_prompt")]` 仍在。本 change 只在 Task 5 扩展其内部逻辑,不改门控本身。
 
-- [ ] **Step 2.6:验证 + Commit**
+- [x] **Step 2.6:验证 + Commit**
 
 Run: `cargo check -p warp`
 Expected: 编译通过。
