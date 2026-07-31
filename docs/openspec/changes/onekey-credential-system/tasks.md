@@ -1,12 +1,12 @@
 ## 1. 存储层 crates/onekey
 
-- [ ] 1.1 新建 `crates/onekey`(package `warp_onekey`)crate,配置 `Cargo.toml`(diesel/keyring/zeroize/uuid/persistence/warp_ssh_manager),加入 workspace members
-- [ ] 1.2 实现 `db.rs`:`CREATE TABLE IF NOT EXISTS onekey_credentials` + `ensure_columns` 兼容 ALTER + `prompt_trigger_rules` 表;`set_database_path` / `with_conn` / 测试连接注入
-- [ ] 1.3 实现 `types.rs`:`OneKeyKind` / `OneKeyCredential` / `SendMode` / `PromptTriggerRule` + 默认关键词常量
-- [ ] 1.4 实现 `secret_store.rs`:`OneKeySecretStore`(keyring service `zap.onekey`,account `<uuid>:secret`,失败 fallback `encrypted_password` 列)
-- [ ] 1.5 实现 `repository.rs`:`find_all` / `find_by_id` / `create` / `update` / `delete` / `list_rules` / `add_rule` / `remove_rule` / `reset_rules_for_mode` / `reset_rules_to_defaults`
-- [ ] 1.6 实现 `repository.rs` 的 `AtomicU64 CREDENTIALS_VERSION`,`create/update/delete` 成功后 `bump_credentials_version()`,导出 `credentials_version()`
-- [ ] 1.7 编写 `types_tests.rs` 与 `repository_tests.rs` 单元测试
+- [x] 1.1 新建 `crates/onekey`(package `warp_onekey`)crate,配置 `Cargo.toml`(diesel/keyring/zeroize/uuid/persistence/warp_ssh_manager),加入 workspace members
+- [x] 1.2 实现 `db.rs`:`CREATE TABLE IF NOT EXISTS onekey_credentials` + `ensure_columns` 兼容 ALTER + `prompt_trigger_rules` 表;`set_database_path` / `with_conn` / 测试连接注入
+- [x] 1.3 实现 `types.rs`:`OneKeyKind` / `OneKeyCredential` / `SendMode` / `PromptTriggerRule` + 默认关键词常量
+- [x] 1.4 实现 `secret_store.rs`:`OneKeySecretStore`(keyring service `zap.onekey`,account `<uuid>:secret`,失败 fallback `encrypted_password` 列)
+- [x] 1.5 实现 `repository.rs`:`find_all` / `find_by_id` / `create` / `update` / `delete` / `list_rules` / `add_rule` / `remove_rule` / `reset_rules_for_mode` / `reset_rules_to_defaults`
+- [x] 1.6 实现 `repository.rs` 的 `AtomicU64 CREDENTIALS_VERSION`,`create/update/delete` 成功后 `bump_credentials_version()`,导出 `credentials_version()`
+- [x] 1.7 编写 `types_tests.rs` 与 `repository_tests.rs` 单元测试
 
 ## 2. Feature flag 与接线
 

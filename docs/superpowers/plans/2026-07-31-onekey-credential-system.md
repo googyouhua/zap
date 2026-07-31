@@ -107,7 +107,7 @@ base-ref: 2951bfb744561eb19e328d3d8df47895e613a3b2
 
 REF: `.worktrees/feature/20260719/quick-credential-input/crates/onekey/` 全部文件。
 
-- [ ] **Step 1.1:新建 crate 骨架并加入 workspace**
+- [x] **Step 1.1:新建 crate 骨架并加入 workspace**
 
 创建 `crates/onekey/Cargo.toml`(与参考分支一致;`zeroize` 不走 workspace 而直接用 `"1.8"`,与 `crates/warp_ssh_manager` 一致):
 
@@ -137,7 +137,7 @@ tempfile.workspace = true
 
 workspace 已用 `members = ["crates/*", "app"]`(见根 `Cargo.toml`),新目录自动成为成员,无需改根 `Cargo.toml`。
 
-- [ ] **Step 1.2:实现 db.rs**
+- [x] **Step 1.2:实现 db.rs**
 
 创建 `crates/onekey/src/db.rs`,内容与参考分支 `crates/onekey/src/db.rs` 逐字一致:
 - `set_database_path(path: PathBuf)`:`DB_PATH: OnceLock<PathBuf>` 一次性写入
@@ -158,19 +158,19 @@ pub use db::{set_database_path, with_conn};
 pub use db::set_test_conn;
 ```
 
-- [ ] **Step 1.3:实现 types.rs + types_tests.rs**
+- [x] **Step 1.3:实现 types.rs + types_tests.rs**
 
 创建 `crates/onekey/src/types.rs`,与参考分支逐字一致:`OneKeyKind::{Password, Key}`(+`as_db_str`/`parse`)、`OneKeyCredential`(`password: Zeroizing<String>`,`key_path: Option<String>`)、`SendMode::{PasswordOnly, UsernameThenPassword}`(+`as_str`)、`PromptTriggerRule`、常量 `DEFAULT_PASSWORD_ONLY_KEYWORDS`/`DEFAULT_USERNAME_AND_PASSWORD_KEYWORDS`。文件末尾挂 `#[cfg(test)] #[path = "types_tests.rs"] mod tests;`。
 
 创建 `crates/onekey/src/types_tests.rs`,与参考分支 `crates/onekey/src/types_tests.rs` 逐字一致(覆盖 `as_db_str`/`parse`/大小写敏感/字段默认值/key_path)。
 
-- [ ] **Step 1.4:实现 secret_store.rs**
+- [x] **Step 1.4:实现 secret_store.rs**
 
 创建 `crates/onekey/src/secret_store.rs`,与参考分支逐字一致:
 - `const SERVICE: &str = "zap.onekey";`
 - `set(id, secret)` / `get(id) -> Result<Option<Zeroizing<String>>>` / `delete(id)`,account 为 `format!("{id}:password")`;`get` 对 `keyring::Error::NoEntry` 返回 `Ok(None)`。
 
-- [ ] **Step 1.5:持久层 model/schema(为 repository 服务)**
+- [x] **Step 1.5:持久层 model/schema(为 repository 服务)**
 
 参考分支改动位置:
 - `crates/persistence/src/model.rs` 在 `Sync Meta` 之前插入 `OneKeyCredentialRow`(8 字段:`id,label,username,notes,encrypted_password,created_at,updated_at,kind,key_path`;`#[diesel(table_name = onekey_credentials)]`)与 `PromptTriggerRuleRow`(`id,keyword,send_mode`)—— 逐字拷贝参考分支 model.rs:1516-1538。
@@ -178,7 +178,7 @@ pub use db::set_test_conn;
 
 注意:本步骤不删除 `ssh_onekey_credentials`(那属于 Task 8)。此时两套表共存,Diesel 编译才不被破坏。
 
-- [ ] **Step 1.6:新建干净迁移(drop 旧表 + 建新表)**
+- [x] **Step 1.6:新建干净迁移(drop 旧表 + 建新表)**
 
 创建 `crates/persistence/migrations/2026-07-31-000000_onekey_credentials_and_drop_ssh_onekey/up.sql`(design doc Decision 2 的 SQL,一次完成"建新表 + 重建 ssh_servers 去外键 + drop 旧表";**不复制**参考分支的 `2026-07-19-000000_add_quick_credentials` 死迁移):
 
@@ -276,7 +276,7 @@ DROP TABLE prompt_trigger_rules;
 
 > 提示:迁移命名时间戳 `2026-07-31-000000...` 可换成更大的合法 Diesel 时间戳,只要大于现有全部迁移即可。迁移目录与既有 `2026-06-09-160000_add_ssh_onekey_key_type` 平级。
 
-- [ ] **Step 1.7:实现 repository.rs + repository_tests.rs**
+- [x] **Step 1.7:实现 repository.rs + repository_tests.rs**
 
 创建 `crates/onekey/src/repository.rs`,与参考分支 `crates/onekey/src/repository.rs` 逐字一致。要点:
 - `static CREDENTIALS_VERSION: AtomicU64` + `credentials_version()` / `bump_credentials_version()`
@@ -287,7 +287,7 @@ DROP TABLE prompt_trigger_rules;
 
 创建 `crates/onekey/src/repository_tests.rs`,与参考分支逐字一致(覆盖空列表、create/find_by_id、update、delete、按 label 排序、Key kind + key_path 往返、混合 kind 列表;`setup_db` 用 `NamedTempFile` + `set_test_conn`)。
 
-- [ ] **Step 1.8:补全 lib.rs re-export 并本地验证**
+- [x] **Step 1.8:补全 lib.rs re-export 并本地验证**
 
 把 `lib.rs` 补成参考分支最终形态(Step 1.2 的占位基础上追加):
 
@@ -303,12 +303,12 @@ pub use types::{
 };
 ```
 
-- [ ] **Step 1.9:跑单测**
+- [x] **Step 1.9:跑单测**
 
 Run: `cargo test -p warp_onekey`
 Expected: 全部 PASS(含 `types_tests.rs` / `repository_tests.rs`)。
 
-- [ ] **Step 1.10:Commit**
+- [x] **Step 1.10:Commit**
 
 ```bash
 git add crates/onekey crates/persistence/src/model.rs crates/persistence/src/schema.rs crates/persistence/migrations/2026-07-31-000000_onekey_credentials_and_drop_ssh_onekey
