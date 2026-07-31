@@ -380,6 +380,28 @@ diesel::table! {
 }
 
 diesel::table! {
+    onekey_credentials (id) {
+        id -> Text,
+        label -> Text,
+        username -> Text,
+        notes -> Text,
+        encrypted_password -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+        kind -> Text,
+        key_path -> Nullable<Text>,
+    }
+}
+
+diesel::table! {
+    prompt_trigger_rules (id) {
+        id -> Text,
+        keyword -> Text,
+        send_mode -> Text,
+    }
+}
+
+diesel::table! {
     ssh_servers (node_id) {
         node_id -> Text,
         host -> Text,

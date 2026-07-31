@@ -14,7 +14,8 @@ use super::schema::{
     generic_string_objects, ignored_suggestions, mcp_environment_variables,
     mcp_server_installations, mcp_server_panes, notebook_panes, notebooks, object_actions,
     object_metadata, object_permissions, pane_branches, pane_leaves, pane_nodes, panels,
-    project_rules, projects, server_experiments, settings_panes, ssh_nodes, ssh_onekey_credentials,
+    project_rules, projects, prompt_trigger_rules, onekey_credentials, server_experiments,
+    settings_panes, ssh_nodes, ssh_onekey_credentials,
     ssh_servers, sync_meta, tabs, team_members, team_settings, teams, terminal_panes,
     user_profiles, welcome_panes, windows, workflow_panes, workflows, workspace_teams, workspaces,
 };
@@ -1533,6 +1534,30 @@ pub struct NewSshServer<'a> {
     pub startup_command: Option<&'a str>,
     pub notes: Option<&'a str>,
     pub credential_id: Option<&'a str>,
+}
+
+#[derive(Identifiable, Queryable, Insertable, Clone, Debug)]
+#[diesel(table_name = onekey_credentials)]
+#[diesel(primary_key(id))]
+pub struct OneKeyCredentialRow {
+    pub id: String,
+    pub label: String,
+    pub username: String,
+    pub notes: String,
+    pub encrypted_password: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub kind: String,
+    pub key_path: Option<String>,
+}
+
+#[derive(Identifiable, Queryable, Insertable, Clone, Debug)]
+#[diesel(table_name = prompt_trigger_rules)]
+#[diesel(primary_key(id))]
+pub struct PromptTriggerRuleRow {
+    pub id: String,
+    pub keyword: String,
+    pub send_mode: String,
 }
 
 // --- Sync Meta ---------------------------------------------------------
