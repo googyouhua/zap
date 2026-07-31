@@ -14893,6 +14893,7 @@ dependencies = [
  "warp_logging",
  "warp_managed_secrets",
  "warp_multi_agent_api",
+ "warp_onekey",
  "warp_ripgrep",
  "warp_ssh_manager",
  "warp_terminal",

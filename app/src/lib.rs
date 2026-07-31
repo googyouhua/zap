@@ -1080,6 +1080,7 @@ fn initialize_app(
     // 必须在 persistence::initialize 跑完 migration 之后才设路径,否则首个
     // SshManager 操作可能撞 missing-table。
     warp_ssh_manager::set_database_path(persistence::database_file_path());
+    warp_onekey::set_database_path(persistence::database_file_path());
 
     let persistence_writer = PersistenceWriter::new(writer_handles);
 
@@ -1507,6 +1508,7 @@ fn initialize_app(
     ctx.add_singleton_model(|_| SystemStats::new());
     ctx.add_singleton_model(|_| KeybindingChangedNotifier::new());
     ctx.add_singleton_model(|_| crate::ssh_manager::SshTreeChangedNotifier::new());
+    ctx.add_singleton_model(|_| crate::ssh_manager::OneKeyCredentialsChangedNotifier::new());
     ctx.add_singleton_model(|_| search::command_palette::SelectedItems::new());
     ctx.add_singleton_model(search::files::model::FileSearchModel::new);
     ctx.add_singleton_model(|_| VimRegisters::new());

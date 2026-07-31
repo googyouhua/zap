@@ -6,6 +6,7 @@
 pub mod candidates;
 pub mod notifier;
 pub mod onekey;
+pub mod onekey_notifier;
 pub mod panel;
 pub mod password_prompt;
 pub mod secret_injector;
@@ -19,6 +20,7 @@ pub mod su_password_injector;
 #[allow(unused_imports)]
 pub use candidates::CandidatesViewModel;
 pub use notifier::{SshTreeChangedEvent, SshTreeChangedNotifier};
+pub use onekey_notifier::{OneKeyCredentialsChangedEvent, OneKeyCredentialsChangedNotifier};
 pub use panel::SshManagerPanel;
 // Re-exports for downstream UI consumers (Commit 2b).
 #[allow(unused_imports)]
