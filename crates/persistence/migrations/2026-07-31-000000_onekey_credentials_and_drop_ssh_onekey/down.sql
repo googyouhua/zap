@@ -40,7 +40,12 @@ CREATE TABLE ssh_servers_new (
   last_connected_at TIMESTAMP,
   credential_id     TEXT REFERENCES ssh_onekey_credentials(id) ON DELETE SET NULL
 );
-INSERT INTO ssh_servers_new SELECT * FROM ssh_servers_old;
+-- 旧 ssh_onekey_credentials 数据已按 up.sql 设计作废(drop),credential_id 引用无法恢复,回滚时落 NULL
+INSERT INTO ssh_servers_new (
+  node_id, host, port, username, auth_type, key_path, startup_command, notes, last_connected_at, credential_id
+)
+SELECT node_id, host, port, username, auth_type, key_path, startup_command, notes, last_connected_at, NULL
+FROM ssh_servers_old;
 DROP TABLE ssh_servers_old;
 ALTER TABLE ssh_servers_new RENAME TO ssh_servers;
 
