@@ -1,0 +1,8 @@
+{
+  "openspec_proposal": "docs/openspec/changes/onekey-credential-system/proposal.md",
+  "openspec_design": "docs/openspec/changes/onekey-credential-system/design.md",
+  "openspec_tasks": "docs/openspec/changes/onekey-credential-system/tasks.md",
+  "openspec_delta_spec": "docs/openspec/changes/onekey-credential-system/specs/auto-fill-trigger/spec.md",
+  "handoff_context": "docs/openspec/changes/onekey-credential-system/.comet/handoff/design-context.json",
+  "handoff_markdown": "docs/openspec/changes/onekey-credential-system/.comet/handoff/design-context.md"
+}

@@ -1,0 +1,18 @@
+{
+  "change": "onekey-credential-system",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "2598b63e7d60d183993faa63498bc653c0e816c6ec51bc08bc01cc05ba535ebd",
+  "files": [
+    { "path": "docs/openspec/changes/onekey-credential-system/proposal.md", "sha256": "2ed2d6e42050202d4121d2d5dcf06ca6c7ef2a3182cf18b97cb5999623346d28" },
+    { "path": "docs/openspec/changes/onekey-credential-system/design.md", "sha256": "98febc81d4ea68c3cacc06302f3251d4870bd01b91456e4059ca5c9663144699" },
+    { "path": "docs/openspec/changes/onekey-credential-system/tasks.md", "sha256": "084edd3152ba3307be1dab1ccb1d52938a35dc6bd9cd3d01156b99bda281cea6" },
+    { "path": "docs/openspec/changes/onekey-credential-system/specs/auto-fill-trigger/spec.md", "sha256": "38b6bdf0c50af7a6fad7472c9eb96a792a5bc0ace6cfd947518429a9c0549bc1" },
+    { "path": "docs/openspec/changes/onekey-credential-system/specs/credential-management/spec.md", "sha256": "e26965a9b64e1d19a4cb9f5875bf35b994dbe147d47964e44f2283771a1acd2f" },
+    { "path": "docs/openspec/changes/onekey-credential-system/specs/credential-panel/spec.md", "sha256": "b37177a22ea629e156f67876d1126935ffa403b386c75e2115a7be56dd365634" },
+    { "path": "docs/openspec/changes/onekey-credential-system/specs/credential-send/spec.md", "sha256": "bb4877679b66f3fb8061a9ca13cda05bf954c1f60acaf0f4e66ee0ec6500b0ba" },
+    { "path": "docs/openspec/changes/onekey-credential-system/specs/credential-store/spec.md", "sha256": "62b4099111e04e647fc19092f6b9b7d7b1031e4b06f44bb4708875cbb125bc31" }
+  ]
+}
