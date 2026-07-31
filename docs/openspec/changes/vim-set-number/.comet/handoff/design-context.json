@@ -1,0 +1,13 @@
+{
+  "change": "vim-set-number",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "e78abc37dffc1b4b948251f0b0950080cc79b52acb3649a318aa0ed8ac103789",
+  "files": [
+    { "path": "openspec/changes/vim-set-number/proposal.md", "sha256": "9f64b7dd9921e82538af3b5cac24ee1ef0f8712d5a72c476667eab781c0a41b4" },
+    { "path": "openspec/changes/vim-set-number/design.md", "sha256": "315152c67a54b86fb32b479735b3acb4b99b9179cd8cd7b2dabf621e27e9b596" },
+    { "path": "openspec/changes/vim-set-number/tasks.md", "sha256": "eafb68c41ba6165f0b47902764cd8dc492d0e3f7d31fd794a1fa915bd5fdd28c" }
+  ]
+}
