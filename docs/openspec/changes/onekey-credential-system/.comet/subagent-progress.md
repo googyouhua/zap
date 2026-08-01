@@ -46,3 +46,14 @@
 - `cargo check -p warp -p warp_onekey -p warp_ssh_manager -p persistence` 全绿。
 - 分 crate 测试:全部通过(见 Task 9 implementer 报告;仅前述 base 既有 1 例失败)。
 - 手动 UI 验证(9.3)需人工:面板唤起/搜索/发送、SSH 面板 CRUD、设置页 CRUD、auto-send、跨视图刷新。
+
+## verify 修复轮(round 1)
+
+- verify-fail(verify_failures=1)返回 build,用户裁决 W1/W2/W4 修复、W3 接受并同步文档。
+- 修复 commit `30de871a`(11 files):
+  - W1 PasswordOnly 清行(onekey_sender.rs)
+  - W2 设置页 label/password 必填校验 + EditForm 空密码保持原值(onekey_page.rs)
+  - W4 新增 `bytes_look_like_onekey_prompt` 宽正则供 onekey 滑窗(su 路径不受影响)
+  - S1/S2/W1/W3 文本同步(design.md/proposal.md/specs/tasks.md)
+- `cargo check -p warp -p warp_onekey -p warp_ssh_manager -p persistence` ✅
+- 待办:重新过 build guard → 再进 verify。
