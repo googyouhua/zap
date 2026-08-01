@@ -15956,6 +15956,7 @@ impl TerminalView {
             }
             view.onekey_prompt_candidates = credentials
                 .into_iter()
+                .filter(|credential| credential.kind == warp_onekey::OneKeyKind::Password)
                 .map(|credential| OneKeyPromptCandidate {
                     label: credential.label,
                     subtitle: credential.username,
