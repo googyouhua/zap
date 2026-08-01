@@ -1000,7 +1000,7 @@ git commit -m "feat: SSH 面板与连接层切换到 warp_onekey 数据源并订
 
 REF: `.worktrees/feature/20260719/quick-credential-input/app/src/settings_view/onekey_page.rs`(全文)、`mod.rs`(OneKey section/页面/导航)。
 
-- [ ] **Step 7.1:新增 SettingsSection::OneKey**
+- [x] **Step 7.1:新增 SettingsSection::OneKey**
 
 `app/src/settings_view/mod.rs`:
 1. `SettingsSection` 枚举在 `CloudSync`(198 行)后追加 `OneKey,`(参考分支 200 行)。
@@ -1008,7 +1008,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/settings_view/o
 3. `impl FromStr`(约 290 行)追加 `"OneKey" | "快速凭证" => Ok(Self::OneKey),`(参考分支 314 行)。
 4. 若存在 `SettingsPageViewHandle` 枚举与 `update_settings_page_view!` 宏,追加 `OneKey(handle)` 分支(参考分支 941 行 `SettingsPageViewHandle::OneKey(handle) => $ctx.update_view(handle, $update)` 与 1829 行 `should_render`)。
 
-- [ ] **Step 7.2:创建 onekey_page.rs**
+- [x] **Step 7.2:创建 onekey_page.rs**
 
 创建 `app/src/settings_view/onekey_page.rs`,逐字拷贝参考分支全文(1127 行)。其结构:
 - `OneKeyPageAction`(14 个变体,含凭据表单 + Trigger Keywords 增删改)
@@ -1018,7 +1018,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/settings_view/o
 - 辅助函数 `load_credentials()` / `load_rules()` / `load_or_init_rules()`(规则为空时 `reset_rules_to_defaults()`)与 `build_editor` / `build_password_editor`(`is_password: true`)等
 - `impl SettingsPageMeta for OneKeyPageView`:`section()` 返回 `SettingsSection::OneKey`
 
-- [ ] **Step 7.3:注册页面 handle 与导航项**
+- [x] **Step 7.3:注册页面 handle 与导航项**
 
 `app/src/settings_view/mod.rs`:
 1. `use onekey_page::OneKeyPageView;` 与 `mod onekey_page;`(参考分支 32/85 行)。
@@ -1037,7 +1037,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/settings_view/o
             SettingsNavItem::Page(SettingsSection::OneKey),
 ```
 
-- [ ] **Step 7.4:验证 + Commit**
+- [x] **Step 7.4:验证 + Commit**
 
 Run: `cargo check -p warp`
 Expected: 编译通过。
