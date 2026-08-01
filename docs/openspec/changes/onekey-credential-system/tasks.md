@@ -50,10 +50,10 @@
 
 ## 8. 删除旧 SSH OneKey 系统
 
-- [ ] 8.1 删除 `crates/warp_ssh_manager`:`SshOneKeyCredential`、`OneKeyCredentialKind`、`SecretKind::OneKeyPassword`、5 个 `*_onekey_credential` repository 方法、`resolve_server_auth` 的 OneKey 分支、`SyncOneKeyCredential`
-- [ ] 8.2 删除 `crates/persistence` 中 `ssh_onekey_credentials` model/schema 引用,新增 drop 表 migration(up/down)
-- [ ] 8.3 删除 `app/src/ssh_manager/onekey.rs`(`load_saved_ssh_credentials`)与终端 `show_onekey_prompt_menu` 的旧数据源
-- [ ] 8.4 全局 grep `quick_credential` / `SshOneKeyCredential` 确认无残留引用
+- [x] 8.1 删除 `crates/warp_ssh_manager`:`SshOneKeyCredential`、`OneKeyCredentialKind`、`SecretKind::OneKeyPassword`、5 个 `*_onekey_credential` repository 方法、`resolve_server_auth` 的 OneKey 分支、`SyncOneKeyCredential`
+- [x] 8.2 删除 `crates/persistence` 中 `ssh_onekey_credentials` model/schema 引用,新增 drop 表 migration(up/down)
+- [x] 8.3 删除 `app/src/ssh_manager/onekey.rs`(`load_saved_ssh_credentials`)与终端 `show_onekey_prompt_menu` 的旧数据源
+- [x] 8.4 全局 grep `quick_credential` / `SshOneKeyCredential` 确认无残留引用
 
 ## 9. 验证
 

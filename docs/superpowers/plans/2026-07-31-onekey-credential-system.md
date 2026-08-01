@@ -1060,7 +1060,7 @@ git commit -m "feat: 新增设置页 OneKeyPage(凭据 CRUD + 触发关键词管
 
 REF: `.worktrees/feature/20260719/quick-credential-input/crates/warp_ssh_manager/`(最终态:无 `SshOneKeyCredential`/`OneKeyCredentialKind`/`SecretKind::OneKeyPassword`/onekey 方法/`SyncOneKeyCredential`;`resolve_server_auth` 对 OneKey 返回 `Err(NotFound)`)。
 
-- [ ] **Step 8.1:删除 warp_ssh_manager 中的旧 OneKey 系统**
+- [x] **Step 8.1:删除 warp_ssh_manager 中的旧 OneKey 系统**
 
 1. `crates/warp_ssh_manager/src/types.rs`:
    - 删 `OneKeyCredentialKind`(62 行)与其 `as_db_str`/`parse`(67-80 行)。
@@ -1078,7 +1078,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/crates/warp_ssh_manager
 6. `crates/warp_ssh_manager/src/ssh_command_tests.rs`:`test_connection_requires_password_for_onekey_auth` / `onekey_key_auth_emits_dash_i_when_key_path_is_resolved`(108/121 行)改为 OneKey 服务器直接返回"无凭据"语义的断言(参考参考分支最终态;若参考分支已删,直接删这两个用例)。
 7. 若删后 `zeroize`/`keyring` 在 `crates/warp_ssh_manager/Cargo.toml` 变为未用依赖,`cargo check` 会告警——按告警清理(该 crate 其它路径仍用 keyring/zeroize,通常无需动)。
 
-- [ ] **Step 8.2:删除 persistence 中 ssh_onekey_credentials 的 model/schema**
+- [x] **Step 8.2:删除 persistence 中 ssh_onekey_credentials 的 model/schema**
 
 1. `crates/persistence/src/schema.rs`:删 `ssh_onekey_credentials` 的 `diesel::table!`(371 行)、`joinable!(ssh_servers -> ssh_onekey_credentials ...)`(541 行)、`allow_tables_to_appear_in_same_query!(ssh_nodes, ssh_onekey_credentials, ssh_servers, ...)`(561 行)中的 `ssh_onekey_credentials`。
 2. `crates/persistence/src/model.rs`:删 `SshOneKeyCredentialRow` 与 `NewSshOneKeyCredential` 定义(grep 确认行号)。
@@ -1086,13 +1086,13 @@ REF: `.worktrees/feature/20260719/quick-credential-input/crates/warp_ssh_manager
 
 > 注:Task 1 的迁移已 drop 表,这里删的是编译期的 model/schema 定义,顺序不冲突。
 
-- [ ] **Step 8.3:删除 app 侧旧文件与旧数据源**
+- [x] **Step 8.3:删除 app 侧旧文件与旧数据源**
 
 1. 删除 `app/src/ssh_manager/onekey.rs`(含 `load_saved_ssh_credentials`)。
 2. `app/src/ssh_manager/mod.rs`:删 `pub mod onekey;`(8 行)。
 3. `app/src/terminal/view.rs`:Task 5 已把 `show_onekey_prompt_menu` / `show_su_root_confirm_menu` 数据源切换掉;确认全文不再引用 `load_saved_ssh_credentials`(grep)。
 
-- [ ] **Step 8.4:全局 grep 残留**
+- [x] **Step 8.4:全局 grep 残留**
 
 Run: `cargo check -p warp` 前先全局扫一遍残留:
 
@@ -1102,7 +1102,7 @@ grep -rn "quick_credential\|SshOneKeyCredential\|OneKeyCredentialKind\|OneKeyPas
 
 Expected: 无任何命中(除 `crates/persistence/migrations/` 下 Task 1 迁移注释中的历史表名——迁移 SQL 必须保留原表名做 down,属预期残留)。
 
-- [ ] **Step 8.5:验证 + Commit**
+- [x] **Step 8.5:验证 + Commit**
 
 Run: `cargo check -p warp`
 Expected: 编译通过,无 dead_code 告警。
