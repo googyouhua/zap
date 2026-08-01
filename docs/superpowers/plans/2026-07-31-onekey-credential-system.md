@@ -734,11 +734,11 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/terminal/prompt
 
 > 本任务的 `classify_prompt` 在参考分支是死代码(只被测试引用),本 change 把它完整接入 `spawn_onekey_prompt_listener`(design doc Decision 4,对参考的改进)。
 
-- [ ] **Step 5.1:实现 classify_prompt + 测试**
+- [x] **Step 5.1:实现 classify_prompt + 测试**
 
 创建 `app/src/terminal/prompt_detection.rs`,逐字拷贝参考分支(`classify_prompt(text, rules) -> Option<SendMode>`,小写化后按规则顺序子串匹配,首个命中优先)+ 内联 `mod tests`(7 个用例)。
 
-- [ ] **Step 5.2:扩展 spawn_onekey_prompt_listener**
+- [x] **Step 5.2:扩展 spawn_onekey_prompt_listener**
 
 修改 `app/src/terminal/view.rs` 的 `spawn_onekey_prompt_listener`(7395-7426 行)。现状:stream 检测到密码提示时 `yield ()`,回调固定走 `show_onekey_prompt_menu`。改为:
 1. stream 在 `bytes_look_like_password_prompt(&buf)` 命中时,先把滑动窗口内容转文本并 `yield` 出去(`buf.clear()` 逻辑不变),让回调能拿到文本做分类。
@@ -775,7 +775,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/terminal/prompt
 
 > 锁纪律(AGENTS.md §5.3):回调在主线程跑,`on_password_prompt_detected` 内不得调用 `self.model.lock()`,凭据加载全部走 `tokio::task::spawn_blocking`,不新增嵌套锁。
 
-- [ ] **Step 5.3:新增 on_password_prompt_detected(auto-send 逻辑)**
+- [x] **Step 5.3:新增 on_password_prompt_detected(auto-send 逻辑)**
 
 在 `app/src/terminal/view.rs` 中新增(放在 `spawn_onekey_prompt_listener` 之后):
 
@@ -819,7 +819,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/terminal/prompt
 
 > 说明:auto-send 只对 `kind == Password` 的凭据生效(与 su_root 的 Password-only 语义一致,design doc 技术风险 2 的保守触发);`find_all()` 的凭据数恰好为 1 才自动发送,0 或多条一律回落菜单。
 
-- [ ] **Step 5.4:show_onekey_prompt_menu 数据源切换**
+- [x] **Step 5.4:show_onekey_prompt_menu 数据源切换**
 
 `show_onekey_prompt_menu`(15507 行)现走 `tokio::task::spawn_blocking(load_saved_ssh_credentials)`。改为新的合并数据源:
 
@@ -898,7 +898,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/terminal/prompt
 
 > 备选方案(供 review 决策):若确认提示菜单不再需要 SSH 服务器凭据,则 `load_prompt_menu_candidates` 可退化为只返回 `warp_onekey::find_all()` 映射的候选,删除上述 SSH 服务器循环(design doc Decision 4 写的是 `warp_onekey::find_all() + SSH 凭据`,默认按该语义实现)。此决策已在 design doc 数据流图中固化,实现时若有疑问在此处与 reviewer 确认一次即可。
 
-- [ ] **Step 5.5:su_root 数据源切换(保留 Password-only 过滤)**
+- [x] **Step 5.5:su_root 数据源切换(保留 Password-only 过滤)**
 
 `show_su_root_confirm_menu`(15764 行)内的 `tokio::task::spawn_blocking(load_saved_ssh_credentials)`(15781 行)改为:
 
@@ -908,7 +908,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/terminal/prompt
 
 其回调中(15785-15817 行),`credentials` 现在是 `Vec<warp_onekey::OneKeyCredential>`,把 `credentials.into_iter().map(|c| OneKeyPromptCandidate { label: c.label, subtitle: c.username, secret: c.password, kind: OneKeyCredentialKind::Password })` 映射到 `view.onekey_prompt_candidates`(参考分支 15548-15560 行的映射写法),随后 `su_root_onekey_candidates` 的 Password-only 过滤(15810-15817 行)保持不变。这样 su_root 菜单只展示 `kind == Password` 的统一凭据(design doc Decision 5)。
 
-- [ ] **Step 5.6:清理 import**
+- [x] **Step 5.6:清理 import**
 
 `app/src/terminal/view.rs:59` 的 `use crate::ssh_manager::onekey::{load_saved_ssh_credentials, OneKeyCredentialKind};` 中:
 - 删除 `load_saved_ssh_credentials`(Task 8 才会删文件,这里先删 import);
@@ -922,7 +922,7 @@ enum OneKeyCredentialKind {
 }
 ```
 
-- [ ] **Step 5.7:验证 + Commit**
+- [x] **Step 5.7:验证 + Commit**
 
 Run: `cargo check -p warp`
 Expected: 编译通过(此时 `app/src/ssh_manager/onekey.rs` 仍存在、`load_saved_ssh_credentials` 已无引用,可能触发 dead_code 警告——预期内,Task 8 删除)。

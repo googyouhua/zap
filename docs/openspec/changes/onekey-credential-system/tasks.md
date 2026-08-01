@@ -29,9 +29,9 @@
 
 ## 5. PTY auto-send 扩展
 
-- [ ] 5.1 扩展 `spawn_onekey_prompt_listener` 滑动窗口检测:加载 `list_rules()` 分类 PromptType
-- [ ] 5.2 恰好一条凭据时按 SendMode 自动发送;0 或多条时回落 OneKey 菜单
-- [ ] 5.3 替换 `show_onekey_prompt_menu` 数据源:同时展示 `warp_onekey::find_all()` 与 SSH 凭据
+- [x] 5.1 扩展 `spawn_onekey_prompt_listener` 滑动窗口检测:加载 `list_rules()` 分类 PromptType
+- [x] 5.2 恰好一条凭据时按 SendMode 自动发送;0 或多条时回落 OneKey 菜单
+- [x] 5.3 替换 `show_onekey_prompt_menu` 数据源:同时展示 `warp_onekey::find_all()` 与 SSH 凭据
 
 ## 6. SSH 面板数据源切换
 
