@@ -7481,14 +7481,16 @@ impl TerminalView {
                 log::warn!("onekey: failed to load credentials for auto-send");
                 return;
             };
-            if let (Some(mode), Some(credential)) = (mode, credentials.into_iter().next()) {
-                crate::terminal::onekey_sender::send_onekey_credential(
-                    view,
-                    &credential,
-                    mode,
-                    ctx,
-                );
+            let single_password_credential = match credentials.as_slice() {
+                [credential] => Some(credential),
+                _ => None,
+            };
+            if let (Some(mode), Some(credential)) = (mode, single_password_credential) {
+                crate::terminal::onekey_sender::send_onekey_credential(view, credential, mode, ctx);
             } else {
+                // 回落就是要弹菜单,先清掉 throttle,否则会被 show_onekey_prompt_menu
+                // 的 ONEKEY_PROMPT_THROTTLE 检查直接 return。
+                view.onekey_last_prompt_at = None;
                 view.show_onekey_prompt_menu(ctx);
             }
         });
