@@ -5,7 +5,7 @@
 ## ADDED Requirements
 
 ### Requirement: 通过面板仅发送密码
-系统 SHALL 在用户于面板选择"仅发送密码"时,只把密码与换行写入 PTY。
+系统 SHALL 在用户于面板选择"仅发送密码"时,清空终端当前行,然后把密码与换行写入 PTY。
 
 #### Scenario: 发送密码到 PTY
 - **WHEN** 用户选择凭据 "my-server" 并选择"仅发送密码"

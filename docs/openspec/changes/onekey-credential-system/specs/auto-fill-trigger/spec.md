@@ -7,8 +7,10 @@
 ### Requirement: 首次运行时填入默认触发关键词
 当功能首次启用且尚无触发规则时,系统 SHALL 填入默认规则:PasswordOnly 关键词 = {password, passphrase},UsernameThenPassword 关键词 = {login, username, user, name, email, account}。
 
+> 注:默认关键词在首次打开 OneKey 设置页时 seed(仅当规则表为空时);auto-send 检测路径(`list_rules`)不独立 seed,因此新装用户需先打开一次设置页后 auto-send 才会生效。
+
 #### Scenario: 首次初始化
-- **WHEN** 系统加载触发规则且发现表为空
+- **WHEN** 用户首次打开 OneKey 设置页且发现规则表为空
 - **THEN** 插入默认关键词集合并返回
 
 #### Scenario: 后续加载保留用户修改

@@ -6,7 +6,7 @@
 
 - **新建 `crates/onekey`(`warp_onekey`)统一凭据 crate**:SQLite(`onekey_credentials` 表)存储元数据 + OS Keychain(`keyring`,service `zap.onekey`)存储 secret,keychain 不可用时 fallback 到 `encrypted_password` 列
 - **统一数据模型**:`OneKeyCredential` 支持 `kind`(Password/Key)与 `key_path`,覆盖旧 OneKey 的密码与密钥/口令两类
-- **终端搜索面板**:`app/src/search/onekey/` 实现 `OneKeyPanel`(SearchBar + SearchMixer),hotkey(`ctrl+shift+k`)触发,模糊搜索 + 键盘导航 + 选中后发送模式选择
+- **终端搜索面板**:`app/src/search/onekey/` 实现 `OneKeyPanel`(SearchBar + SearchMixer),hotkey(`cmd_or_ctrl_shift("u")`)触发,模糊搜索 + 键盘导航 + 选中后发送模式选择
 - **发送引擎**:`SendMode::{PasswordOnly, UsernameThenPassword}`,清行后写 PTY,`UsernameThenPassword` 模式间隔 ~150ms,secret 全程 `Zeroizing<String>`
 - **PTY 自动检测 + auto-send**:扩展密码提示监听,`prompt_trigger_rules` 表存可配置关键词(默认 PasswordOnly={password, passphrase}, UsernameThenPassword={login, username, user, name, email, account});恰好一条凭据时自动发送,否则回落 OneKey 菜单
 - **设置页**:`app/src/settings_view/onekey_page.rs` 提供凭据 CRUD + 触发关键词管理

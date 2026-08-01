@@ -12,7 +12,7 @@ pub fn send_onekey_credential(
 ) {
     match mode {
         SendMode::PasswordOnly => {
-            terminal_view.write_to_pty(
+            terminal_view.clear_line_editor_and_write_to_pty(
                 format!("{}\n", *credential.password).into_bytes(),
                 ctx,
             );

@@ -74,6 +74,8 @@ pub struct OneKeyPageView {
     edit_notes: String,
     edit_kind: OneKeyKind,
     edit_key_path: String,
+    /// 表单保存时的校验错误(显示在 Save 按钮上方)。
+    form_error: Option<String>,
     label_editor: ViewHandle<EditorView>,
     username_editor: ViewHandle<EditorView>,
     password_editor: ViewHandle<EditorView>,
@@ -129,6 +131,7 @@ impl OneKeyPageView {
             edit_notes: String::new(),
             edit_kind: OneKeyKind::Password,
             edit_key_path: String::new(),
+            form_error: None,
             label_editor,
             username_editor,
             password_editor,
@@ -712,6 +715,23 @@ impl OneKeyPageView {
             ));
         }
 
+        if let Some(error) = &self.form_error {
+            content.add_child(
+                Container::new(
+                    Text::new_inline(
+                        error.clone(),
+                        appearance.ui_font_family(),
+                        appearance.ui_font_size(),
+                    )
+                    .with_color(appearance.theme().ui_error_color())
+                    .finish(),
+                )
+                .with_margin_top(8.)
+                .with_margin_bottom(8.)
+                .finish(),
+            );
+        }
+
         content.add_child(
             Container::new(
                 Flex::row()
@@ -766,6 +786,7 @@ impl TypedActionView for OneKeyPageView {
         match action {
             OneKeyPageAction::ShowAddForm => {
                 self.mode = PageMode::AddForm;
+                self.form_error = None;
                 self.edit_label = String::new();
                 self.edit_username = String::new();
                 self.edit_password = String::new();
@@ -794,16 +815,28 @@ impl TypedActionView for OneKeyPageView {
                     .cloned()
                 {
                     self.mode = PageMode::EditForm(credential.id.clone());
+                    self.form_error = None;
                     self.populate(&credential, ctx);
                     ctx.notify();
                 }
             }
             OneKeyPageAction::CancelForm => {
                 self.mode = PageMode::List;
+                self.form_error = None;
                 ctx.notify();
             }
             OneKeyPageAction::SaveForm => {
                 self.sync_edit_fields(ctx);
+                if self.edit_label.is_empty() {
+                    self.form_error = Some("Label is required".to_string());
+                    ctx.notify();
+                    return;
+                }
+                if matches!(&self.mode, PageMode::AddForm) && self.edit_password.is_empty() {
+                    self.form_error = Some("Password is required".to_string());
+                    ctx.notify();
+                    return;
+                }
                 match &self.mode {
                     PageMode::AddForm => {
                         let key_path = if self.edit_kind == OneKeyKind::Key
@@ -832,19 +865,31 @@ impl TypedActionView for OneKeyPageView {
                         } else {
                             None
                         };
+                        // 编辑表单回填真实密码;密码编辑器为空表示用户不改密码,
+                        // 保持原密码不覆盖。
+                        let password = if self.edit_password.is_empty() {
+                            self.credentials
+                                .iter()
+                                .find(|c| &c.id == credential_id)
+                                .map(|c| c.password.clone())
+                                .unwrap_or_default()
+                        } else {
+                            std::mem::take(&mut self.edit_password).into()
+                        };
                         let credential = OneKeyCredential {
                             id: credential_id.clone(),
                             label: std::mem::take(&mut self.edit_label),
                             username: std::mem::take(&mut self.edit_username),
                             notes: std::mem::take(&mut self.edit_notes),
-                            password: std::mem::take(&mut self.edit_password).into(),
+                            password,
                             kind: self.edit_kind,
                             key_path,
                         };
                         report_if_error!(warp_onekey::update(&credential));
                     }
-                    _ => {}
+                    PageMode::List => {}
                 }
+                self.form_error = None;
                 OneKeyCredentialsChangedNotifier::handle(ctx).update(ctx, |_, ctx| {
                     ctx.emit(OneKeyCredentialsChangedEvent::CredentialsChanged);
                 });

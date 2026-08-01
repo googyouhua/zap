@@ -41,7 +41,7 @@ pub struct OneKeyCredential {
 
 DB 表 `onekey_credentials`:`kind`(TEXT, default 'password')+ `key_path`(TEXT, nullable)两列,`encrypted_password` 列保留作 keychain fallback。`prompt_trigger_rules` 表存触发关键词。Keychain service 名 `zap.onekey`,account key `<uuid>:secret`。
 
-表结构通过 `CREATE TABLE IF NOT EXISTS` + `ensure_columns`(pragma 检查后 ALTER)在 `db.rs` 中维护,不新增 Diesel migration 目录 —— 与 `warp_ssh_manager::db` 的既有模式一致,避免为独立 crate 引入 app 层 migration 编排。
+表结构通过新增 Diesel migration(`crates/persistence/migrations/2026-07-31-000000_onekey_credentials_and_drop_ssh_onekey`)创建:`up.sql` 建 `onekey_credentials` + `prompt_trigger_rules` 表,drop 旧 `ssh_onekey_credentials` 表并重建 `ssh_servers`(去掉对其的外键约束)。`db.rs` 保留 `CREATE TABLE IF NOT EXISTS` + `ensure_columns`(pragma 检查后 ALTER)作防御性层,与 `warp_ssh_manager::db` 的既有模式一致。
 
 **替代方案**:复用 `warp_ssh_manager` 的 `ssh_onekey_credentials` 表加列。否决理由:旧表与 SSH 节点模型耦合(有 key_path/kind 等字段),且本 change 要删除该表;独立 crate 生命周期清晰、依赖无环(`warp_ssh_manager` 不依赖 `warp_onekey`)。
 
@@ -107,5 +107,5 @@ SSH 连接流程(`open_ssh_terminal`、SFTP `build_auth_method`):`auth_type == O
 
 ## Open Questions
 
-- 快捷键默认值:参考分支为 `ctrl+shift+k`(macOS `cmd+shift+k`),是否与既有按键冲突需在实现时确认(不影响 spec/任务拆分)。
+- 快捷键:已定为 `cmd_or_ctrl_shift("u")`(macOS cmd+shift+u,Linux/Win ctrl+shift+u)→ `ToggleOneKeyPanel`,避开与 main 中 ClearBuffer 的 `ctrl+shift+k` 冲突;已在 `app/src/terminal/view/init.rs` 注册并确认无绑定冲突(与 Design Doc D3 一致)。
 - `encrypted_password` 列的加密实现:参考分支留作 keychain fallback,具体加解密方式实现时确定。

@@ -58,7 +58,7 @@ use crate::ai::predict::prompt_suggestions::{
 use crate::search::slash_command_menu::static_commands::commands;
 #[cfg(feature = "onekey_input")]
 use crate::search::onekey::{OneKeyPanel, OneKeyPanelEvent};
-use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
+use crate::ssh_manager::password_prompt::bytes_look_like_onekey_prompt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OneKeyCredentialKind {
@@ -7436,7 +7436,7 @@ impl TerminalView {
                     let drop_n = buf.len() - ONEKEY_PROMPT_SLIDING_WINDOW_BYTES;
                     buf.drain(..drop_n);
                 }
-                if bytes_look_like_password_prompt(&buf) {
+                if bytes_look_like_onekey_prompt(&buf) {
                     let text = String::from_utf8_lossy(&buf).into_owned();
                     buf.clear();
                     yield text;
