@@ -2709,6 +2709,7 @@ workspace-left-panel-ssh-manager-onekey-key-path = 私钥路径
 workspace-left-panel-ssh-manager-onekey-key-path-required = 私钥账密必须填写私钥路径。
 workspace-left-panel-ssh-manager-onekey-secret = 密码
 workspace-left-panel-ssh-manager-onekey-save = 保存
+workspace-left-panel-ssh-manager-onekey-refresh = 刷新
 workspace-left-panel-ssh-manager-onekey-label-required = 账密名称不能为空。
 workspace-left-panel-ssh-manager-menu-new-folder = 新建文件夹
 workspace-left-panel-ssh-manager-menu-new-server = 新建 SSH 服务器

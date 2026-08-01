@@ -13,6 +13,7 @@ use std::time::Duration;
 use warp_ssh_manager::SshRepository;
 use warp_ssh_manager::secrets::SshSecretStore;
 use warp_ssh_manager::types::{AuthType, ResolvedSshAuth, SshServerInfo};
+use warp_ssh_manager::SecretKind;
 use zap_sftp::Sftp;
 use zap_sftp::session::{AuthMethod, SftpSession};
 use zap_sftp::types::OpenOptions;
@@ -82,6 +83,21 @@ pub fn connect_from_server(
 }
 
 fn resolve_sftp_auth(server: &SshServerInfo) -> Result<ResolvedSshAuth, SftpOpsError> {
+    if server.auth_type == AuthType::OneKey {
+        let credential_id = server.credential_id.as_deref().ok_or_else(|| {
+            SftpOpsError::NoCredentials("OneKey credential_id is missing".to_string())
+        })?;
+        let credential = warp_onekey::find_by_id(credential_id)
+            .map_err(|e| SftpOpsError::NoCredentials(format!("OneKey lookup error: {e}")))?
+            .ok_or_else(|| SftpOpsError::NoCredentials("OneKey credential not found".to_string()))?;
+        return Ok(ResolvedSshAuth {
+            username: credential.username,
+            auth_type: AuthType::Password,
+            key_path: credential.key_path.clone(),
+            secret_lookup_id: credential_id.to_string(),
+            secret_kind: SecretKind::Password,
+        });
+    }
     warp_ssh_manager::with_conn(|conn| Ok(SshRepository::resolve_server_auth(conn, server)?))
         .map_err(|e| SftpOpsError::NoCredentials(format!("解析认证失败: {e}")))
 }

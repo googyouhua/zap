@@ -12,6 +12,18 @@ use warpui::{App, WindowInvalidation};
 use crate::test_util::settings::initialize_settings_for_tests;
 use crate::view_components::dropdown::DropdownAction;
 
+/// 初始化两个 DB 连接,供创建 SshServerView 的 App 测试使用:
+/// - warp_ssh_manager 需要文件路径(reload() 里避免 relay panic)
+/// - warp_onekey 需要文件路径(reload() 里 find_all() 自动建表)
+fn setup_app_dbs() {
+    let _ = warp_ssh_manager::set_database_path(
+        std::env::temp_dir().join("warp_ssh_server_view_test.sqlite"),
+    );
+    let _ = warp_onekey::set_database_path(
+        std::env::temp_dir().join("warp_onekey_server_view_test.sqlite"),
+    );
+}
+
 /// 进程内 mock,绕开 OS keychain。支持错误注入,模拟 NoBackend / Keyring 错。
 struct MockSecretStore {
     inner: Mutex<HashMap<String, String>>,
@@ -145,37 +157,39 @@ fn empty_editor_keyring_error_returns_none() {
 
 #[test]
 fn onekey_lookup_uses_shared_credential_id_and_kind() {
-    let store = MockSecretStore::with_secret("cred-1", SecretKind::OneKeyPassword, "shared-pw");
-    let pw = resolve_test_password(Some("cred-1"), SecretKind::OneKeyPassword, "", &store).unwrap();
+    let store = MockSecretStore::new();
+    store.set("cred-1", SecretKind::Password, "shared-pw").unwrap();
+    let pw = resolve_test_password(Some("cred-1"), SecretKind::Password, "", &store).unwrap();
     assert_eq!(&*pw, "shared-pw");
 }
 
 fn credential(
     id: &str,
     username: &str,
-    kind: OneKeyCredentialKind,
+    kind: OneKeyKind,
     key_path: Option<&str>,
-) -> SshOneKeyCredential {
-    let now = chrono::Utc::now().naive_utc();
-    SshOneKeyCredential {
+    password: &str,
+) -> OneKeyCredential {
+    OneKeyCredential {
         id: id.to_string(),
         label: "shared".to_string(),
         username: username.to_string(),
+        notes: String::new(),
+        password: Zeroizing::new(password.to_string()),
         kind,
         key_path: key_path.map(ToString::to_string),
-        created_at: now,
-        updated_at: now,
     }
 }
 
 #[test]
 fn onekey_test_connection_uses_shared_password_credential() {
-    let store = MockSecretStore::with_secret("cred-1", SecretKind::OneKeyPassword, "shared-pw");
+    let store = MockSecretStore::new();
     let credentials = vec![credential(
         "cred-1",
         "shared-user",
-        OneKeyCredentialKind::Password,
+        OneKeyKind::Password,
         None,
+        "shared-pw",
     )];
     let server = SshServerInfo {
         node_id: "server-1".to_string(),
@@ -200,12 +214,13 @@ fn onekey_test_connection_uses_shared_password_credential() {
 
 #[test]
 fn onekey_test_connection_prefers_editor_password() {
-    let store = MockSecretStore::with_secret("cred-1", SecretKind::OneKeyPassword, "old-pw");
+    let store = MockSecretStore::new();
     let credentials = vec![credential(
         "cred-1",
         "shared-user",
-        OneKeyCredentialKind::Password,
+        OneKeyKind::Password,
         None,
+        "old-pw",
     )];
     let server = SshServerInfo {
         node_id: "server-1".to_string(),
@@ -228,12 +243,13 @@ fn onekey_test_connection_prefers_editor_password() {
 
 #[test]
 fn onekey_key_credential_resolves_test_connection_to_key_auth() {
-    let store = MockSecretStore::with_secret("cred-1", SecretKind::Passphrase, "key-passphrase");
+    let store = MockSecretStore::new();
     let credentials = vec![credential(
         "cred-1",
         "key-user",
-        OneKeyCredentialKind::Key,
+        OneKeyKind::Key,
         Some("/home/me/.ssh/id_ed25519"),
+        "key-passphrase",
     )];
     let server = SshServerInfo {
         node_id: "server-1".to_string(),
@@ -259,16 +275,18 @@ fn onekey_key_credential_resolves_test_connection_to_key_auth() {
 #[test]
 fn missing_lookup_id_returns_none_when_editor_empty() {
     let store = MockSecretStore::new();
-    assert!(resolve_test_password(None, SecretKind::OneKeyPassword, "", &store).is_none());
+    assert!(resolve_test_password(None, SecretKind::Password, "", &store).is_none());
 }
 
 #[test]
 fn selecting_onekey_dropdown_item_does_not_rebuild_dropdown_while_it_is_borrowed() {
+    setup_app_dbs();
     App::test((), |mut app| async move {
         crate::i18n::init(Some("en"));
         initialize_settings_for_tests(&mut app);
         app.add_singleton_model(|_| Appearance::mock());
         app.add_singleton_model(|_| SshTreeChangedNotifier::new());
+        app.add_singleton_model(|_| OneKeyCredentialsChangedNotifier::new());
 
         let (window_id, view) = app.add_window(WindowStyle::NotStealFocus, |ctx| {
             let mut view = SshServerView::new("server-1".to_string(), ctx);
@@ -286,8 +304,9 @@ fn selecting_onekey_dropdown_item_does_not_rebuild_dropdown_while_it_is_borrowed
             view.onekey_credentials = vec![credential(
                 "cred-1",
                 "shared-user",
-                OneKeyCredentialKind::Password,
+                OneKeyKind::Password,
                 None,
+                "shared-pw",
             )];
             view.rebuild_onekey_credential_dropdown(ctx);
             view

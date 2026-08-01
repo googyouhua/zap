@@ -11,7 +11,10 @@ use crate::editor::{
 use crate::pane_group::focus_state::PaneFocusHandle;
 use crate::pane_group::pane::view;
 use crate::pane_group::{BackingView, PaneConfiguration, PaneEvent};
-use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
+use crate::ssh_manager::{
+    OneKeyCredentialsChangedEvent, OneKeyCredentialsChangedNotifier, SshTreeChangedEvent,
+    SshTreeChangedNotifier,
+};
 use crate::view_components::dropdown::{Dropdown, DropdownItem};
 use pathfinder_geometry::vector::vec2f;
 use warp_core::ui::appearance::Appearance;
@@ -32,10 +35,10 @@ use warpui::{
 };
 
 use warp_ssh_manager::{
-    AuthType, ConnectionStatus, KeychainSecretStore, NodeKind, OneKeyCredentialKind, SecretKind,
-    SshNode, SshOneKeyCredential, SshRepository, SshSecretStore, SshSecretStoreError,
-    SshServerInfo,
+    AuthType, ConnectionStatus, KeychainSecretStore, NodeKind, SecretKind,
+    SshNode, SshRepository, SshSecretStore, SshSecretStoreError, SshServerInfo,
 };
+use warp_onekey::{OneKeyCredential, OneKeyKind};
 use zeroize::Zeroizing;
 
 const FIELD_LABEL_MARGIN_TOP: f32 = 6.0;
@@ -71,6 +74,7 @@ pub enum SshServerAction {
     SetManagedOneKeyKey,
     SaveManagedOneKeyCredential,
     DeleteManagedOneKeyCredential,
+    RefreshOneKeyCredentialList,
 }
 
 /// 一次性显示在 Save 按钮上方/下方的状态标签。
@@ -128,17 +132,18 @@ pub struct SshServerView {
     onekey_manager_delete_btn_state: MouseStateHandle,
     onekey_manager_password_btn_state: MouseStateHandle,
     onekey_manager_key_btn_state: MouseStateHandle,
+    onekey_manager_refresh_btn_state: MouseStateHandle,
     onekey_key_path_picker_btn_state: MouseStateHandle,
     onekey_manager_row_states: Vec<MouseStateHandle>,
 
     /// 分组下拉选择器。
     group_dropdown: ViewHandle<Dropdown<SshServerAction>>,
     onekey_credential_dropdown: ViewHandle<Dropdown<SshServerAction>>,
-    onekey_credentials: Vec<SshOneKeyCredential>,
+    onekey_credentials: Vec<OneKeyCredential>,
     selected_onekey_credential_id: Option<String>,
     show_onekey_manager: bool,
     managed_onekey_credential_id: Option<String>,
-    managed_onekey_kind: OneKeyCredentialKind,
+    managed_onekey_kind: OneKeyKind,
     /// 缓存所有文件夹节点 (id, name),用于重建下拉列表。
     folders: Vec<(String, String)>,
     /// 当前选中的分组 ID(None 表示根级)。
@@ -230,6 +235,7 @@ impl SshServerView {
             onekey_manager_delete_btn_state: MouseStateHandle::default(),
             onekey_manager_password_btn_state: MouseStateHandle::default(),
             onekey_manager_key_btn_state: MouseStateHandle::default(),
+            onekey_manager_refresh_btn_state: MouseStateHandle::default(),
             onekey_key_path_picker_btn_state: MouseStateHandle::default(),
             onekey_manager_row_states: Vec::new(),
             group_dropdown,
@@ -238,7 +244,7 @@ impl SshServerView {
             selected_onekey_credential_id: None,
             show_onekey_manager: false,
             managed_onekey_credential_id: None,
-            managed_onekey_kind: OneKeyCredentialKind::Password,
+            managed_onekey_kind: OneKeyKind::Password,
             folders: Vec::new(),
             current_group_id: None,
             original_parent_id: None,
@@ -290,6 +296,16 @@ impl SshServerView {
             });
         }
 
+        ctx.subscribe_to_model(
+            &OneKeyCredentialsChangedNotifier::handle(ctx),
+            |me, _, event, ctx| match event {
+                OneKeyCredentialsChangedEvent::CredentialsChanged => {
+                    me.reload_onekey_credentials(ctx);
+                    ctx.notify();
+                }
+            },
+        );
+
         me
     }
 
@@ -339,17 +355,16 @@ impl SshServerView {
                 .filter(|n| matches!(n.kind, NodeKind::Folder))
                 .map(|n| (n.id.clone(), n.name.clone()))
                 .collect();
-            let onekey_credentials = SshRepository::list_onekey_credentials(c)?;
-            Ok((node, server, folders, onekey_credentials))
+            Ok((node, server, folders))
         });
         match result {
-            Ok((node, server, folders, onekey_credentials)) => {
+            Ok((node, server, folders)) => {
                 self.original_parent_id = node.as_ref().and_then(|n| n.parent_id.clone());
                 self.current_group_id = self.original_parent_id.clone();
                 self.node = node;
                 self.server = server;
                 self.folders = folders;
-                self.onekey_credentials = onekey_credentials;
+                self.onekey_credentials = warp_onekey::find_all().unwrap_or_default();
             }
             Err(e) => {
                 log::error!("ssh_server_view: reload failed: {e:?}");
@@ -502,8 +517,13 @@ impl SshServerView {
             SshServerAction::SelectOneKeyCredential(None),
         )];
         for (index, credential) in self.onekey_credentials.iter().enumerate() {
+            let label = if credential.username.is_empty() {
+                credential.label.clone()
+            } else {
+                format!("{} ({})", credential.label, credential.username)
+            };
             items.push(DropdownItem::new(
-                credential.display_label(),
+                label,
                 SshServerAction::SelectOneKeyCredential(Some(index)),
             ));
         }
@@ -526,15 +546,7 @@ impl SshServerView {
     }
 
     fn reload_onekey_credentials(&mut self, ctx: &mut ViewContext<Self>) {
-        match warp_ssh_manager::with_conn(|c| Ok(SshRepository::list_onekey_credentials(c)?)) {
-            Ok(credentials) => {
-                self.onekey_credentials = credentials;
-            }
-            Err(e) => {
-                log::error!("ssh_server_view: reload onekey credentials failed: {e:?}");
-                self.onekey_credentials = Vec::new();
-            }
-        }
+        self.onekey_credentials = warp_onekey::find_all().unwrap_or_default();
         if let Some(selected_id) = self.selected_onekey_credential_id.as_ref() {
             if !self
                 .onekey_credentials
@@ -579,7 +591,7 @@ impl SshServerView {
 
     fn set_managed_onekey_form_from_credential(
         &mut self,
-        credential: &SshOneKeyCredential,
+        credential: &OneKeyCredential,
         ctx: &mut ViewContext<Self>,
     ) {
         self.managed_onekey_credential_id = Some(credential.id.clone());
@@ -599,7 +611,7 @@ impl SshServerView {
 
     fn clear_managed_onekey_form(&mut self, ctx: &mut ViewContext<Self>) {
         self.managed_onekey_credential_id = None;
-        self.managed_onekey_kind = OneKeyCredentialKind::Password;
+        self.managed_onekey_kind = OneKeyKind::Password;
         self.onekey_label_editor
             .update(ctx, |editor, ctx| editor.set_buffer_text("", ctx));
         self.onekey_user_editor
@@ -982,7 +994,7 @@ impl SshServerView {
         }
 
         let key_path = key_path.trim().to_string();
-        if self.managed_onekey_kind == OneKeyCredentialKind::Key && key_path.is_empty() {
+        if self.managed_onekey_kind == OneKeyKind::Key && key_path.is_empty() {
             self.status = Some(StatusBanner::Error(crate::t!(
                 "workspace-left-panel-ssh-manager-onekey-key-path-required"
             )));
@@ -991,8 +1003,8 @@ impl SshServerView {
         }
 
         let key_path_for_db = match self.managed_onekey_kind {
-            OneKeyCredentialKind::Password => None,
-            OneKeyCredentialKind::Key => Some(key_path),
+            OneKeyKind::Password => None,
+            OneKeyKind::Key => Some(key_path),
         };
         let username = username.trim().to_string();
         let credential_result = if let Some(id) = self.managed_onekey_credential_id.clone() {
@@ -1013,23 +1025,21 @@ impl SshServerView {
             credential.username = username;
             credential.kind = self.managed_onekey_kind;
             credential.key_path = key_path_for_db;
-            warp_ssh_manager::with_conn(move |conn| {
-                SshRepository::update_onekey_credential(conn, &credential)?;
-                credential = SshRepository::get_onekey_credential(conn, &id)?
-                    .ok_or_else(|| warp_ssh_manager::SshRepositoryError::NotFound(id.clone()))?;
-                Ok(credential)
-            })
+            if !secret.is_empty() {
+                credential.password = Zeroizing::new(secret.clone());
+            }
+            warp_onekey::update(&credential)
         } else {
-            let kind = self.managed_onekey_kind;
-            warp_ssh_manager::with_conn(move |conn| {
-                Ok(SshRepository::create_onekey_credential(
-                    conn,
-                    &label,
-                    &username,
-                    kind,
-                    key_path_for_db.as_deref(),
-                )?)
-            })
+            let credential = OneKeyCredential {
+                id: String::new(),
+                label,
+                username,
+                notes: String::new(),
+                password: Zeroizing::new(secret.clone()),
+                kind: self.managed_onekey_kind,
+                key_path: key_path_for_db,
+            };
+            warp_onekey::create(&credential)
         };
 
         let credential = match credential_result {
@@ -1043,13 +1053,6 @@ impl SshServerView {
         };
 
         if !secret.is_empty() {
-            let kind = secret_kind_for_onekey_credential(credential.kind);
-            if let Err(e) = KeychainSecretStore.set(&credential.id, kind, &secret) {
-                log::error!("ssh_server_view: OneKey keychain write failed: {e:?}");
-                self.status = Some(StatusBanner::Error(format!("keychain: {e}")));
-                ctx.notify();
-                return;
-            }
             self.password_editor
                 .update(ctx, |editor, ctx| editor.set_buffer_text("", ctx));
         }
@@ -1057,6 +1060,9 @@ impl SshServerView {
         self.managed_onekey_credential_id = Some(credential.id.clone());
         self.selected_onekey_credential_id = Some(credential.id);
         self.reload_onekey_credentials(ctx);
+        OneKeyCredentialsChangedNotifier::handle(ctx).update(ctx, |_, ctx| {
+            ctx.emit(OneKeyCredentialsChangedEvent::CredentialsChanged);
+        });
         if let Some(selected) = self.selected_onekey_credential_id.as_ref().and_then(|id| {
             self.onekey_credentials
                 .iter()
@@ -1074,27 +1080,20 @@ impl SshServerView {
             return;
         };
 
-        if let Err(e) = warp_ssh_manager::with_conn(|conn| {
-            SshRepository::delete_onekey_credential(conn, &id)?;
-            Ok(())
-        }) {
+        if let Err(e) = warp_onekey::delete(&id) {
             log::error!("ssh_server_view: delete OneKey credential failed: {e:?}");
             self.status = Some(StatusBanner::Error(format!("{e}")));
             ctx.notify();
             return;
-        }
-
-        let store = KeychainSecretStore;
-        for kind in [SecretKind::OneKeyPassword, SecretKind::Passphrase] {
-            if let Err(e) = store.delete(&id, kind) {
-                log::warn!("ssh_server_view: delete OneKey secret failed: {e:?}");
-            }
         }
         if self.selected_onekey_credential_id.as_deref() == Some(id.as_str()) {
             self.selected_onekey_credential_id = None;
         }
         self.clear_managed_onekey_form(ctx);
         self.reload_onekey_credentials(ctx);
+        OneKeyCredentialsChangedNotifier::handle(ctx).update(ctx, |_, ctx| {
+            ctx.emit(OneKeyCredentialsChangedEvent::CredentialsChanged);
+        });
         ctx.notify();
     }
 
@@ -1618,13 +1617,13 @@ impl SshServerView {
             .with_main_axis_size(MainAxisSize::Min)
             .with_child(make_pill(
                 crate::t!("workspace-left-panel-ssh-manager-onekey-type-password"),
-                self.managed_onekey_kind == OneKeyCredentialKind::Password,
+                self.managed_onekey_kind == OneKeyKind::Password,
                 self.onekey_manager_password_btn_state.clone(),
                 SshServerAction::SetManagedOneKeyPassword,
             ))
             .with_child(make_pill(
                 crate::t!("workspace-left-panel-ssh-manager-onekey-type-key"),
-                self.managed_onekey_kind == OneKeyCredentialKind::Key,
+                self.managed_onekey_kind == OneKeyKind::Key,
                 self.onekey_manager_key_btn_state.clone(),
                 SshServerAction::SetManagedOneKeyKey,
             ))
@@ -1647,7 +1646,7 @@ impl SshServerView {
     fn render_onekey_manager_row(
         &self,
         index: usize,
-        credential: &SshOneKeyCredential,
+        credential: &OneKeyCredential,
         appearance: &Appearance,
     ) -> Box<dyn Element> {
         let theme = appearance.theme();
@@ -1663,8 +1662,8 @@ impl SshServerView {
             theme.main_text_color(theme.background())
         };
         let subtitle = match credential.kind {
-            OneKeyCredentialKind::Password => credential.username.clone(),
-            OneKeyCredentialKind::Key => credential
+            OneKeyKind::Password => credential.username.clone(),
+            OneKeyKind::Key => credential
                 .key_path
                 .as_deref()
                 .unwrap_or_default()
@@ -1761,8 +1760,25 @@ impl SshServerView {
                 ctx.dispatch_typed_action(SshServerAction::NewOneKeyCredential)
             })
             .finish();
+        let refresh_button = appearance
+            .ui_builder()
+            .button(
+                ButtonVariant::Secondary,
+                self.onekey_manager_refresh_btn_state.clone(),
+            )
+            .with_centered_text_label(crate::t!("workspace-left-panel-ssh-manager-onekey-refresh"))
+            .build()
+            .on_click(move |ctx, _, _| {
+                ctx.dispatch_typed_action(SshServerAction::RefreshOneKeyCredentialList)
+            })
+            .finish();
         let mut list = Flex::column().with_cross_axis_alignment(CrossAxisAlignment::Stretch);
-        list.add_child(Container::new(add_button).with_margin_bottom(8.0).finish());
+        let header_row = Flex::row()
+            .with_spacing(4.0)
+            .with_child(add_button)
+            .with_child(refresh_button)
+            .finish();
+        list.add_child(Container::new(header_row).with_margin_bottom(8.0).finish());
         for (index, credential) in self.onekey_credentials.iter().enumerate() {
             list.add_child(
                 Container::new(self.render_onekey_manager_row(index, credential, appearance))
@@ -1779,10 +1795,10 @@ impl SshServerView {
         .finish();
 
         let secret_label = match self.managed_onekey_kind {
-            OneKeyCredentialKind::Password => {
+            OneKeyKind::Password => {
                 crate::t!("workspace-left-panel-ssh-manager-onekey-secret")
             }
-            OneKeyCredentialKind::Key => {
+            OneKeyKind::Key => {
                 crate::t!("workspace-left-panel-ssh-manager-passphrase")
             }
         };
@@ -1798,7 +1814,7 @@ impl SshServerView {
             appearance,
         ));
         form.add_child(self.render_onekey_kind_toggle(appearance));
-        if self.managed_onekey_kind == OneKeyCredentialKind::Key {
+        if self.managed_onekey_kind == OneKeyKind::Key {
             form.add_child(self.render_onekey_key_path_field(appearance));
         }
         form.add_child(self.render_text_field(&secret_label, &self.password_editor, appearance));
@@ -1911,14 +1927,7 @@ fn password_lookup_for_server_form(server: &SshServerInfo) -> (Option<String>, S
     match server.auth_type {
         AuthType::Password => (Some(server.node_id.clone()), SecretKind::Password),
         AuthType::Key => (Some(server.node_id.clone()), SecretKind::Passphrase),
-        AuthType::OneKey => (server.credential_id.clone(), SecretKind::OneKeyPassword),
-    }
-}
-
-fn secret_kind_for_onekey_credential(kind: OneKeyCredentialKind) -> SecretKind {
-    match kind {
-        OneKeyCredentialKind::Password => SecretKind::OneKeyPassword,
-        OneKeyCredentialKind::Key => SecretKind::Passphrase,
+        AuthType::OneKey => (None, SecretKind::Password),
     }
 }
 
@@ -1968,6 +1977,7 @@ impl TypedActionView for SshServerView {
             SshServerAction::PickKeyFile => self.on_pick_key_file(ctx),
             SshServerAction::PickOneKeyKeyFile => self.on_pick_onekey_key_file(ctx),
             SshServerAction::OpenOneKeyManager => {
+                self.reload_onekey_credentials(ctx);
                 if self.managed_onekey_credential_id.is_none() {
                     self.sync_managed_onekey_selection(ctx);
                 }
@@ -1993,8 +2003,8 @@ impl TypedActionView for SshServerView {
                 ctx.notify();
             }
             SshServerAction::SetManagedOneKeyPassword => {
-                if self.managed_onekey_kind != OneKeyCredentialKind::Password {
-                    self.managed_onekey_kind = OneKeyCredentialKind::Password;
+                if self.managed_onekey_kind != OneKeyKind::Password {
+                    self.managed_onekey_kind = OneKeyKind::Password;
                     self.onekey_key_path_editor
                         .update(ctx, |editor, ctx| editor.set_buffer_text("", ctx));
                     self.password_editor
@@ -2003,8 +2013,8 @@ impl TypedActionView for SshServerView {
                 }
             }
             SshServerAction::SetManagedOneKeyKey => {
-                if self.managed_onekey_kind != OneKeyCredentialKind::Key {
-                    self.managed_onekey_kind = OneKeyCredentialKind::Key;
+                if self.managed_onekey_kind != OneKeyKind::Key {
+                    self.managed_onekey_kind = OneKeyKind::Key;
                     self.password_editor
                         .update(ctx, |editor, ctx| editor.set_buffer_text("", ctx));
                     ctx.notify();
@@ -2015,6 +2025,18 @@ impl TypedActionView for SshServerView {
             }
             SshServerAction::DeleteManagedOneKeyCredential => {
                 self.on_delete_managed_onekey_credential(ctx)
+            }
+            SshServerAction::RefreshOneKeyCredentialList => {
+                self.reload_onekey_credentials(ctx);
+                if let Some(selected) = self.selected_onekey_credential_id.as_ref().and_then(|id| {
+                    self.onekey_credentials
+                        .iter()
+                        .find(|credential| credential.id == *id)
+                        .cloned()
+                }) {
+                    self.set_managed_onekey_form_from_credential(&selected, ctx);
+                }
+                ctx.notify();
             }
             SshServerAction::SelectGroup(index) => {
                 let new_group_id =
@@ -2290,11 +2312,11 @@ impl BackingView for SshServerView {
 /// date: 2026-06-01
 fn resolve_test_server_and_password(
     mut server: SshServerInfo,
-    onekey_credentials: &[SshOneKeyCredential],
+    onekey_credentials: &[OneKeyCredential],
     editor_text: &str,
     store: &dyn SshSecretStore,
 ) -> Result<(SshServerInfo, Option<Zeroizing<String>>), String> {
-    let (secret_lookup_id, secret_kind) = if server.auth_type == AuthType::OneKey {
+    let password = if server.auth_type == AuthType::OneKey {
         let credential_id = server
             .credential_id
             .as_ref()
@@ -2305,19 +2327,19 @@ fn resolve_test_server_and_password(
             .ok_or_else(|| crate::t!("workspace-left-panel-ssh-manager-onekey-select-required"))?;
         server.username = credential.username.clone();
         server.auth_type = match credential.kind {
-            OneKeyCredentialKind::Password => AuthType::Password,
-            OneKeyCredentialKind::Key => AuthType::Key,
+            OneKeyKind::Password => AuthType::Password,
+            OneKeyKind::Key => AuthType::Key,
         };
         server.key_path = credential.key_path.clone();
-        (
-            Some(credential.id.clone()),
-            secret_kind_for_onekey_credential(credential.kind),
-        )
+        if !editor_text.is_empty() {
+            Some(Zeroizing::new(editor_text.to_string()))
+        } else {
+            Some(credential.password.clone())
+        }
     } else {
-        password_lookup_for_server_form(&server)
+        let (secret_lookup_id, secret_kind) = password_lookup_for_server_form(&server);
+        resolve_test_password(secret_lookup_id.as_deref(), secret_kind, editor_text, store)
     };
-    let password =
-        resolve_test_password(secret_lookup_id.as_deref(), secret_kind, editor_text, store);
     Ok((server, password))
 }
 

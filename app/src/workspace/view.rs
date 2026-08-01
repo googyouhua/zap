@@ -5441,30 +5441,49 @@ impl Workspace {
         server: warp_ssh_manager::SshServerInfo,
         ctx: &mut ViewContext<Self>,
     ) {
-        use warp_ssh_manager::{KeychainSecretStore, SecretKind, SshRepository, SshSecretStore};
+        use warp_ssh_manager::{
+            AuthType, KeychainSecretStore, SecretKind, SshRepository, SshSecretStore,
+        };
 
         let (server_for_connection, secret_lookup_id, secret_kind) =
-            match warp_ssh_manager::with_conn(|conn| {
-                let resolved_auth = SshRepository::resolve_server_auth(conn, &server)?;
-                let mut server_for_connection = server.clone();
-                server_for_connection.username = resolved_auth.username;
-                server_for_connection.auth_type = resolved_auth.auth_type;
-                server_for_connection.key_path = resolved_auth.key_path;
-                Ok((
-                    server_for_connection,
-                    resolved_auth.secret_lookup_id,
-                    resolved_auth.secret_kind,
-                ))
-            }) {
-                Ok(resolved) => resolved,
-                Err(e) => {
-                    log::warn!("ssh auth resolution failed (will continue without injection): {e}");
-                    let fallback_kind = match server.auth_type {
-                        warp_ssh_manager::AuthType::Password => SecretKind::Password,
-                        warp_ssh_manager::AuthType::Key => SecretKind::Passphrase,
-                        warp_ssh_manager::AuthType::OneKey => SecretKind::OneKeyPassword,
-                    };
-                    (server.clone(), node_id.clone(), fallback_kind)
+            if server.auth_type == AuthType::OneKey {
+                let credential_id = server.credential_id.clone().unwrap_or_default();
+                match warp_onekey::find_by_id(&credential_id) {
+                    Ok(Some(credential)) => {
+                        let mut server_for_connection = server.clone();
+                        server_for_connection.username = credential.username;
+                        server_for_connection.auth_type = AuthType::Password;
+                        server_for_connection.key_path = credential.key_path.clone();
+                        (server_for_connection, credential_id, SecretKind::Password)
+                    }
+                    _ => {
+                        log::warn!("OneKey credential not found or lookup failed, falling back");
+                        (server.clone(), node_id.clone(), SecretKind::Password)
+                    }
+                }
+            } else {
+                match warp_ssh_manager::with_conn(|conn| {
+                    let resolved_auth = SshRepository::resolve_server_auth(conn, &server)?;
+                    let mut server_for_connection = server.clone();
+                    server_for_connection.username = resolved_auth.username;
+                    server_for_connection.auth_type = resolved_auth.auth_type;
+                    server_for_connection.key_path = resolved_auth.key_path;
+                    Ok((
+                        server_for_connection,
+                        resolved_auth.secret_lookup_id,
+                        resolved_auth.secret_kind,
+                    ))
+                }) {
+                    Ok(resolved) => resolved,
+                    Err(e) => {
+                        log::warn!("ssh auth resolution failed (will continue without injection): {e}");
+                        let fallback_kind = match server.auth_type {
+                            warp_ssh_manager::AuthType::Password => SecretKind::Password,
+                            warp_ssh_manager::AuthType::Key => SecretKind::Passphrase,
+                            warp_ssh_manager::AuthType::OneKey => SecretKind::OneKeyPassword,
+                        };
+                        (server.clone(), node_id.clone(), fallback_kind)
+                    }
                 }
             };
         let cmd = warp_ssh_manager::build_ssh_command_line(&server_for_connection);

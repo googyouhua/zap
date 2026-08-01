@@ -2792,6 +2792,7 @@ workspace-left-panel-ssh-manager-onekey-key-path = Key path
 workspace-left-panel-ssh-manager-onekey-key-path-required = Key path is required for private key credentials.
 workspace-left-panel-ssh-manager-onekey-secret = Password
 workspace-left-panel-ssh-manager-onekey-save = Save
+workspace-left-panel-ssh-manager-onekey-refresh = Refresh
 workspace-left-panel-ssh-manager-onekey-label-required = Credential name cannot be empty.
 workspace-left-panel-ssh-manager-menu-new-folder = New folder
 workspace-left-panel-ssh-manager-menu-new-server = New SSH server

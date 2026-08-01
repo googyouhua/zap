@@ -2672,6 +2672,7 @@ workspace-left-panel-ssh-manager-onekey-key-path = 鍵のパス
 workspace-left-panel-ssh-manager-onekey-key-path-required = 秘密鍵の認証情報には鍵のパスが必要です。
 workspace-left-panel-ssh-manager-onekey-secret = パスワード
 workspace-left-panel-ssh-manager-onekey-save = 保存
+workspace-left-panel-ssh-manager-onekey-refresh = リフレッシュ
 workspace-left-panel-ssh-manager-onekey-label-required = 認証情報名は空にできません。
 workspace-left-panel-ssh-manager-menu-new-folder = 新しいフォルダ
 workspace-left-panel-ssh-manager-menu-new-server = 新しい SSH サーバー
