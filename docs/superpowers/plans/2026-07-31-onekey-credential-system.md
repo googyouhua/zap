@@ -1121,17 +1121,17 @@ git commit -m "refactor: 删除旧 SSH OneKey 系统(SshOneKeyCredential/ssh_one
 **Files:**
 - 无新文件(只读验证)
 
-- [ ] **Step 9.1:cargo check**
+- [x] **Step 9.1:cargo check**
 
 Run: `cargo check`
 Expected: 全 workspace 编译通过。
 
-- [ ] **Step 9.2:全量测试**
+- [x] **Step 9.2:全量测试**
 
 Run: `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2`
 Expected: 全绿。重点观察 `warp_onekey` 的 `types_tests` / `repository_tests`、`search::onekey::data_source_tests`、`terminal::prompt_detection` 内联测试、`terminal::onekey_sender` 内联测试、`warp_ssh_manager` 剩余测试。
 
-- [ ] **Step 9.3:手动验证清单**
+- [x] **Step 9.3:手动验证清单**
 
 在本地 dev 构建(启用 `onekey_input` + `onekey_prompt` + `FeatureFlag::OneKeyInput/OneKeyPrompt`)逐项验证:
 1. 面板:`cmd/ctrl+shift+u` 唤起 `OneKeyPanel`,搜索(按 label/username 模糊匹配)、键盘上下导航、Enter 选中后出现发送模式二选一,两项都能把凭据写入 PTY(PasswordOnly 直接写 `secret\n`;UsernameThenPassword 先写 `username\n` 再 ~150ms 写 `password\n`)。
@@ -1145,7 +1145,7 @@ Expected: 全绿。重点观察 `warp_onekey` 的 `types_tests` / `repository_te
 9. SSH 连接(SFTP / workspace 面板)对 `auth_type == OneKey` 的服务器能正确用 `warp_onekey::find_by_id` 解析并连上。
 10. 热键冲突:`cmd/ctrl+shift+u` 在终端内不触发其它动作。
 
-- [ ] **Step 9.4:收尾(可选)**
+- [x] **Step 9.4:收尾(可选)**
 
 若确认 feature 稳定,按 `promote-feature` skill 流程将 `OneKeyInput` 从 DOGFOOD 提升/清理 flag——**不在本 change 范围内**,仅在计划里留档。
 

@@ -57,6 +57,6 @@
 
 ## 9. 验证
 
-- [ ] 9.1 `cargo check` 通过
-- [ ] 9.2 运行 `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2` 全量测试
-- [ ] 9.3 手动验证:面板唤起/搜索/发送、SSH 面板 OneKey CRUD、设置页 CRUD、auto-send、跨视图自动刷新
+- [x] 9.1 `cargo check` 通过
+- [x] 9.2 运行 `cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2` 全量测试
+- [x] 9.3 手动验证:面板唤起/搜索/发送、SSH 面板 OneKey CRUD、设置页 CRUD、auto-send、跨视图自动刷新
