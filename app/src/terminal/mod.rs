@@ -59,6 +59,7 @@ pub mod model_events;
 #[cfg(feature = "onekey_input")]
 pub mod onekey_sender;
 pub mod platform;
+pub mod prompt_detection;
 pub mod profile_model_selector;
 pub mod prompt;
 pub mod prompt_render_helper;

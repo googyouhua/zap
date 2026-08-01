@@ -58,8 +58,13 @@ use crate::ai::predict::prompt_suggestions::{
 use crate::search::slash_command_menu::static_commands::commands;
 #[cfg(feature = "onekey_input")]
 use crate::search::onekey::{OneKeyPanel, OneKeyPanelEvent};
-use crate::ssh_manager::onekey::{load_saved_ssh_credentials, OneKeyCredentialKind};
 use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OneKeyCredentialKind {
+    Password,
+    Passphrase,
+}
 use crate::terminal::input::inline_menu::InlineMenuPositioner;
 use crate::terminal::view::passive_suggestions::PromptSuggestionResolution;
 pub use crate::terminal::view::rich_content::{
@@ -7432,19 +7437,61 @@ impl TerminalView {
                     buf.drain(..drop_n);
                 }
                 if bytes_look_like_password_prompt(&buf) {
+                    let text = String::from_utf8_lossy(&buf).into_owned();
                     buf.clear();
-                    yield ();
+                    yield text;
                 }
             }
         };
 
         let _ = ctx.spawn_stream_local(
             prompt_stream,
-            |view, (), ctx| {
-                view.show_onekey_prompt_menu(ctx);
+            |view, text, ctx| {
+                view.on_password_prompt_detected(text, ctx);
             },
             |_, _| {},
         );
+    }
+
+    /// PTY 滑动窗口检测到密码提示后的统一入口:
+    /// 1. 按 prompt_trigger_rules 分类 SendMode;
+    /// 2. 恰好一条 Password 凭据 → 按 SendMode 自动发送;
+    /// 3. 否则回落 show_onekey_prompt_menu。
+    fn on_password_prompt_detected(&mut self, prompt_text: String, ctx: &mut ViewContext<Self>) {
+        if self.ssh_secret_auto_injection_in_flight
+            || self
+                .onekey_last_prompt_at
+                .is_some_and(|instant| instant.elapsed() < ONEKEY_PROMPT_THROTTLE)
+        {
+            return;
+        }
+        self.onekey_last_prompt_at = Some(Instant::now());
+
+        let future = async move {
+            let rules = warp_onekey::list_rules()?;
+            let mode = crate::terminal::prompt_detection::classify_prompt(&prompt_text, &rules);
+            let credentials: Vec<_> = warp_onekey::find_all()?
+                .into_iter()
+                .filter(|c| c.kind == warp_onekey::OneKeyKind::Password)
+                .collect();
+            anyhow::Ok((mode, credentials))
+        };
+        ctx.spawn(future, move |view, result, ctx| {
+            let Ok((mode, credentials)) = result else {
+                log::warn!("onekey: failed to load credentials for auto-send");
+                return;
+            };
+            if let (Some(mode), Some(credential)) = (mode, credentials.into_iter().next()) {
+                crate::terminal::onekey_sender::send_onekey_credential(
+                    view,
+                    &credential,
+                    mode,
+                    ctx,
+                );
+            } else {
+                view.show_onekey_prompt_menu(ctx);
+            }
+        });
     }
 
     fn write_agent_bytes_to_pty<B: Into<Cow<'static, [u8]>>>(
@@ -15526,6 +15573,73 @@ impl TerminalView {
         });
     }
 
+    /// 加载 OneKey 提示菜单候选:统一凭据 + SSH 服务器保存的凭据。
+    /// (原 app/src/ssh_manager/onekey.rs::load_saved_ssh_credentials 的替代,
+    /// 共享凭据部分改由 warp_onekey::find_all() 提供。)
+    fn load_prompt_menu_candidates() -> anyhow::Result<Vec<OneKeyPromptCandidate>> {
+        let mut candidates: Vec<OneKeyPromptCandidate> = Vec::new();
+
+        for credential in warp_onekey::find_all()? {
+            candidates.push(OneKeyPromptCandidate {
+                label: credential.label,
+                subtitle: if credential.username.is_empty() {
+                    String::new()
+                } else {
+                    credential.username
+                },
+                secret: credential.password,
+                kind: OneKeyCredentialKind::Password,
+            });
+        }
+
+        // SSH 服务器自身保存的凭据(node 级 password/key auth)
+        let store = warp_ssh_manager::KeychainSecretStore;
+        warp_ssh_manager::with_conn(|conn| {
+            use warp_ssh_manager::{AuthType, NodeKind, SecretKind, SshRepository, SshSecretStore};
+            let nodes = SshRepository::list_nodes(conn)?;
+            for node in nodes {
+                if node.kind != NodeKind::Server {
+                    continue;
+                }
+                let Some(server) = SshRepository::get_server(conn, &node.id)? else {
+                    continue;
+                };
+                let (secret_kind, kind) = match server.auth_type {
+                    AuthType::Password => (SecretKind::Password, OneKeyCredentialKind::Password),
+                    AuthType::Key => (SecretKind::Passphrase, OneKeyCredentialKind::Passphrase),
+                    AuthType::OneKey => continue,
+                };
+                let Some(secret) = store.get(&node.id, secret_kind)? else {
+                    continue;
+                };
+                if secret.is_empty() {
+                    continue;
+                }
+                let target = if server.username.is_empty() {
+                    format!("{}:{}", server.host, server.port)
+                } else {
+                    format!("{}@{}:{}", server.username, server.host, server.port)
+                };
+                let subtitle = match server.auth_type {
+                    AuthType::Key => {
+                        let key_path = server.key_path.as_deref().unwrap_or("key");
+                        format!("{key_path} for {target}")
+                    }
+                    _ => target,
+                };
+                candidates.push(OneKeyPromptCandidate {
+                    label: node.name,
+                    subtitle,
+                    secret,
+                    kind,
+                });
+            }
+            Ok(())
+        })?;
+
+        Ok(candidates)
+    }
+
     fn show_onekey_prompt_menu(&mut self, ctx: &mut ViewContext<Self>) {
         if self.context_menu_state.is_some()
             || self.ssh_secret_auto_injection_in_flight
@@ -15542,7 +15656,7 @@ impl TerminalView {
         // Keychain + SQLite 都是同步阻塞 API,不能在 UI 线程跑。
         // 走 spawn_blocking,完成后回到主线程展示菜单。
         let future = async move {
-            tokio::task::spawn_blocking(load_saved_ssh_credentials)
+            tokio::task::spawn_blocking(Self::load_prompt_menu_candidates)
                 .await
                 .unwrap_or_else(|e| Err(anyhow::anyhow!("onekey: join error: {e}")))
         };
@@ -15564,12 +15678,7 @@ impl TerminalView {
 
             view.onekey_prompt_candidates = credentials
                 .into_iter()
-                .map(|credential| OneKeyPromptCandidate {
-                    label: credential.label,
-                    subtitle: credential.subtitle,
-                    secret: credential.secret,
-                    kind: credential.kind,
-                })
+                .filter(|candidate| matches!(candidate.kind, OneKeyCredentialKind::Password))
                 .collect();
             view.onekey_query.clear();
             // 复用常驻 editor:清空内容、把焦点稍后转过来。
@@ -15824,7 +15933,7 @@ impl TerminalView {
         }
 
         let future = async move {
-            tokio::task::spawn_blocking(load_saved_ssh_credentials)
+            tokio::task::spawn_blocking(warp_onekey::find_all)
                 .await
                 .unwrap_or_else(|e| Err(anyhow::anyhow!("onekey: join error: {e}")))
         };
@@ -15848,9 +15957,9 @@ impl TerminalView {
                 .into_iter()
                 .map(|credential| OneKeyPromptCandidate {
                     label: credential.label,
-                    subtitle: credential.subtitle,
-                    secret: credential.secret,
-                    kind: credential.kind,
+                    subtitle: credential.username,
+                    secret: credential.password,
+                    kind: OneKeyCredentialKind::Password,
                 })
                 .collect();
             view.su_root_onekey_candidates = view
