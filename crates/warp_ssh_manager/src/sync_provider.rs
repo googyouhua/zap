@@ -6,7 +6,7 @@
 use crate::db::with_conn;
 use crate::repository::{SshRepository, SyncMetaRepository};
 use crate::secrets::{KeychainSecretStore, SecretKind, SshSecretStore};
-use crate::types::{NodeKind, OneKeyCredentialKind};
+use crate::types::NodeKind;
 use diesel::connection::{Connection, SimpleConnection};
 use diesel::{QueryDsl, RunQueryDsl};
 use serde::{Deserialize, Serialize};
@@ -16,11 +16,10 @@ use zap_sync::{SyncDataProvider, SyncEngineError, SyncVersionStore};
 use zeroize::Zeroizing;
 
 /// keychain 三种凭据 kind,用于 collect/apply/orphan-cleanup 时统一遍历
-const ALL_SECRET_KINDS: [SecretKind; 4] = [
+const ALL_SECRET_KINDS: [SecretKind; 3] = [
     SecretKind::Password,
     SecretKind::Passphrase,
     SecretKind::RootPassword,
-    SecretKind::OneKeyPassword,
 ];
 
 /// SSH 同步用的节点数据
@@ -52,25 +51,11 @@ pub struct SyncServer {
     pub root_password_encrypted: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncOneKeyCredential {
-    pub id: String,
-    pub label: String,
-    pub username: String,
-    #[serde(default = "default_onekey_kind")]
-    pub kind: String,
-    #[serde(default)]
-    pub key_path: Option<String>,
-    pub password_encrypted: Option<String>,
-}
-
 /// SSH 同步数据
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SshSyncData {
     pub nodes: Vec<SyncNode>,
     pub servers: Vec<SyncServer>,
-    #[serde(default)]
-    pub onekey_credentials: Vec<SyncOneKeyCredential>,
 }
 
 /// SSH 数据同步提供者
@@ -98,23 +83,6 @@ impl SyncDataProvider for SshSyncProvider {
 
         let mut sync_nodes = Vec::new();
         let mut sync_servers = Vec::new();
-        let mut sync_onekey_credentials = Vec::new();
-
-        let onekey_credentials =
-            with_conn(|conn| Ok(SshRepository::list_onekey_credentials(conn)?))
-                .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
-        for credential in onekey_credentials {
-            let secret_kind = onekey_secret_kind(credential.kind);
-            let password = read_secret(&self.secret_store, &credential.id, secret_kind)?;
-            sync_onekey_credentials.push(SyncOneKeyCredential {
-                id: credential.id,
-                label: credential.label,
-                username: credential.username,
-                kind: credential.kind.as_db_str().to_string(),
-                key_path: credential.key_path,
-                password_encrypted: encrypt_optional(token, password.as_deref())?,
-            });
-        }
 
         for node in &nodes {
             sync_nodes.push(SyncNode {
@@ -163,7 +131,6 @@ impl SyncDataProvider for SshSyncProvider {
         let data = SshSyncData {
             nodes: sync_nodes,
             servers: sync_servers,
-            onekey_credentials: sync_onekey_credentials,
         };
 
         serde_json::to_value(&data)
@@ -207,45 +174,18 @@ impl SyncDataProvider for SshSyncProvider {
                 }
             }
         }
-        for credential in &ssh_data.onekey_credentials {
-            let secret_kind = onekey_secret_kind(
-                OneKeyCredentialKind::parse(&credential.kind)
-                    .unwrap_or(OneKeyCredentialKind::Password),
-            );
-            match &credential.password_encrypted {
-                Some(enc) => {
-                    let value = crypto::decrypt(token, enc)
-                        .map_err(|e| SyncEngineError::Crypto(e.to_string()))?;
-                    pending_secrets.push(PendingSecret {
-                        node_id: credential.id.clone(),
-                        kind: secret_kind,
-                        value,
-                    });
-                }
-                None => {
-                    explicit_clears.push((credential.id.clone(), secret_kind));
-                }
-            }
-        }
 
         // ---- 阶段 0.5 ---- 拓扑排序节点,父节点先于子节点;orphan(parent 不在数据集中)
         // 视作根节点插入,避免 SQLite FK 违规整事务回滚
         let sorted_nodes = topologically_sort_nodes(&ssh_data.nodes);
 
         // ---- 阶段 0.6 ---- 收集本地原有 keychain owner id,供后续 orphan keychain 清理
-        let mut existing_secret_owner_ids: Vec<String> = with_conn(|conn| {
+        let existing_secret_owner_ids: Vec<String> = with_conn(|conn| {
             Ok(persistence::schema::ssh_nodes::table
                 .select(persistence::schema::ssh_nodes::id)
                 .load::<String>(conn)?)
         })
         .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
-        let existing_credential_ids: Vec<String> = with_conn(|conn| {
-            Ok(persistence::schema::ssh_onekey_credentials::table
-                .select(persistence::schema::ssh_onekey_credentials::id)
-                .load::<String>(conn)?)
-        })
-        .map_err(|e| SyncEngineError::Provider(e.to_string()))?;
-        existing_secret_owner_ids.extend(existing_credential_ids);
 
         // ---- 阶段 1 ---- 先写 keychain。任一失败 → 立即中止,不动 DB。
         // 跟踪 (node_id, kind, prior_value) 列表,DB 阶段失败时:
@@ -288,23 +228,7 @@ impl SyncDataProvider for SshSyncProvider {
         // ---- 阶段 2 ---- DB 事务:DELETE + 按拓扑顺序 INSERT
         let db_result = with_conn(|conn| {
             conn.transaction::<(), anyhow::Error, _>(|conn| {
-                conn.batch_execute(
-                    "DELETE FROM ssh_servers; DELETE FROM ssh_nodes; DELETE FROM ssh_onekey_credentials;",
-                )?;
-
-                for credential in &ssh_data.onekey_credentials {
-                    diesel::insert_into(persistence::schema::ssh_onekey_credentials::table)
-                        .values(persistence::model::NewSshOneKeyCredential {
-                            id: &credential.id,
-                            label: &credential.label,
-                            username: &credential.username,
-                            kind: OneKeyCredentialKind::parse(&credential.kind)
-                                .unwrap_or(OneKeyCredentialKind::Password)
-                                .as_db_str(),
-                            key_path: credential.key_path.as_deref(),
-                        })
-                        .execute(conn)?;
-                }
+                conn.batch_execute("DELETE FROM ssh_servers; DELETE FROM ssh_nodes;")?;
 
                 for node in &sorted_nodes {
                     let kind = NodeKind::parse(&node.kind)
@@ -364,14 +288,8 @@ impl SyncDataProvider for SshSyncProvider {
 
         // ---- 阶段 3b ---- 清理 orphan keychain:本地原有但远程已删除的 owner id 对应的密码,
         // 必须显式 delete,否则同 UUID 节点重新出现时会读到陈旧密码 (PR #161 review #4)
-        let mut new_secret_owner_ids: HashSet<&str> =
+        let new_secret_owner_ids: HashSet<&str> =
             ssh_data.nodes.iter().map(|n| n.id.as_str()).collect();
-        new_secret_owner_ids.extend(
-            ssh_data
-                .onekey_credentials
-                .iter()
-                .map(|credential| credential.id.as_str()),
-        );
         for old_id in &existing_secret_owner_ids {
             if new_secret_owner_ids.contains(old_id.as_str()) {
                 continue;
@@ -450,17 +368,6 @@ fn encrypt_optional(token: &str, value: Option<&str>) -> Result<Option<String>, 
         Some(s) => Ok(Some(
             crypto::encrypt(token, s).map_err(|e| SyncEngineError::Crypto(e.to_string()))?,
         )),
-    }
-}
-
-fn default_onekey_kind() -> String {
-    OneKeyCredentialKind::Password.as_db_str().to_string()
-}
-
-fn onekey_secret_kind(kind: OneKeyCredentialKind) -> SecretKind {
-    match kind {
-        OneKeyCredentialKind::Password => SecretKind::OneKeyPassword,
-        OneKeyCredentialKind::Key => SecretKind::Passphrase,
     }
 }
 
@@ -668,7 +575,6 @@ mod tests {
                 passphrase_encrypted: None,
                 root_password_encrypted: None,
             }],
-            onekey_credentials: Vec::new(),
         };
         let json = serde_json::to_string(&data).unwrap();
         let parsed: SshSyncData = serde_json::from_str(&json).unwrap();
@@ -713,68 +619,7 @@ mod tests {
 
         let parsed: SshSyncData = serde_json::from_str(json).unwrap();
 
-        assert!(parsed.onekey_credentials.is_empty());
         assert_eq!(parsed.servers[0].credential_id, None);
-    }
-
-    #[test]
-    fn test_onekey_credential_serialization_roundtrip() {
-        let data = SshSyncData {
-            nodes: Vec::new(),
-            servers: Vec::new(),
-            onekey_credentials: vec![SyncOneKeyCredential {
-                id: "cred-1".to_string(),
-                label: "prod-root".to_string(),
-                username: "root".to_string(),
-                kind: "key".to_string(),
-                key_path: Some("/home/root/.ssh/id_ed25519".to_string()),
-                password_encrypted: Some("enc".to_string()),
-            }],
-        };
-
-        let json = serde_json::to_string(&data).unwrap();
-        let parsed: SshSyncData = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(parsed.onekey_credentials.len(), 1);
-        assert_eq!(parsed.onekey_credentials[0].id, "cred-1");
-        assert_eq!(parsed.onekey_credentials[0].label, "prod-root");
-        assert_eq!(parsed.onekey_credentials[0].username, "root");
-        assert_eq!(parsed.onekey_credentials[0].kind, "key");
-        assert_eq!(
-            parsed.onekey_credentials[0].key_path.as_deref(),
-            Some("/home/root/.ssh/id_ed25519")
-        );
-        assert_eq!(
-            parsed.onekey_credentials[0].password_encrypted,
-            Some("enc".to_string())
-        );
-    }
-
-    #[test]
-    fn test_onekey_credential_deserializes_legacy_payload_as_password() {
-        let json = r#"{
-            "id": "cred-1",
-            "label": "prod-root",
-            "username": "root",
-            "password_encrypted": null
-        }"#;
-
-        let parsed: SyncOneKeyCredential = serde_json::from_str(json).unwrap();
-
-        assert_eq!(parsed.kind, "password");
-        assert_eq!(parsed.key_path, None);
-    }
-
-    #[test]
-    fn test_onekey_key_credentials_use_passphrase_secret_slot() {
-        assert_eq!(
-            onekey_secret_kind(OneKeyCredentialKind::Password),
-            SecretKind::OneKeyPassword
-        );
-        assert_eq!(
-            onekey_secret_kind(OneKeyCredentialKind::Key),
-            SecretKind::Passphrase
-        );
     }
 
     #[test]

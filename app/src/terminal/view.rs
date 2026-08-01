@@ -15576,8 +15576,7 @@ impl TerminalView {
     }
 
     /// 加载 OneKey 提示菜单候选:统一凭据 + SSH 服务器保存的凭据。
-    /// (原 app/src/ssh_manager/onekey.rs::load_saved_ssh_credentials 的替代,
-    /// 共享凭据部分改由 warp_onekey::find_all() 提供。)
+    /// 共享凭据部分由 warp_onekey::find_all() 提供。
     fn load_prompt_menu_candidates() -> anyhow::Result<Vec<OneKeyPromptCandidate>> {
         let mut candidates: Vec<OneKeyPromptCandidate> = Vec::new();
 

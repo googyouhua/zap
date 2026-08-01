@@ -21,10 +21,9 @@ pub use ssh_config_parser::{
     load_candidates_from, parse_ssh_config,
 };
 pub use sync_provider::{
-    DbVersionStore, SshSyncData, SshSyncProvider, SyncNode, SyncOneKeyCredential, SyncServer,
+    DbVersionStore, SshSyncData, SshSyncProvider, SyncNode, SyncServer,
 };
 pub use types::ConnectionStatus;
 pub use types::{
-    AuthType, NodeKind, OneKeyCredentialKind, ResolvedSshAuth, SshNode, SshOneKeyCredential,
-    SshServerInfo,
+    AuthType, NodeKind, ResolvedSshAuth, SshNode, SshServerInfo,
 };

@@ -14,7 +14,6 @@ pub enum SecretKind {
     Password,
     Passphrase,
     RootPassword,
-    OneKeyPassword,
 }
 
 impl SecretKind {
@@ -23,7 +22,6 @@ impl SecretKind {
             SecretKind::Password => "password",
             SecretKind::Passphrase => "passphrase",
             SecretKind::RootPassword => "root_password",
-            SecretKind::OneKeyPassword => "onekey_password",
         }
     }
 }
@@ -173,13 +171,11 @@ mod tests {
     }
 
     #[test]
-    fn password_and_passphrase_have_separate_keys() {
+    fn password_passphrase_rootpassword_have_separate_keys() {
         let store = InMemorySecretStore::default();
         store.set("n", SecretKind::Password, "pw").unwrap();
         store.set("n", SecretKind::Passphrase, "pp").unwrap();
-        store
-            .set("n", SecretKind::OneKeyPassword, "onekey-pw")
-            .unwrap();
+        store.set("n", SecretKind::RootPassword, "rp").unwrap();
         assert_eq!(
             &*store.get("n", SecretKind::Password).unwrap().unwrap(),
             "pw"
@@ -189,8 +185,8 @@ mod tests {
             "pp"
         );
         assert_eq!(
-            &*store.get("n", SecretKind::OneKeyPassword).unwrap().unwrap(),
-            "onekey-pw"
+            &*store.get("n", SecretKind::RootPassword).unwrap().unwrap(),
+            "rp"
         );
     }
 

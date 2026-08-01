@@ -54,7 +54,6 @@ fn account_key(node_id: &str, kind: SecretKind) -> String {
         SecretKind::Password => "password",
         SecretKind::Passphrase => "passphrase",
         SecretKind::RootPassword => "root_password",
-        SecretKind::OneKeyPassword => "onekey_password",
     };
     format!("{node_id}:{suffix}")
 }

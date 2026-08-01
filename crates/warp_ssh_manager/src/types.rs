@@ -58,29 +58,6 @@ impl AuthType {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum OneKeyCredentialKind {
-    Password,
-    Key,
-}
-
-impl OneKeyCredentialKind {
-    pub fn as_db_str(&self) -> &'static str {
-        match self {
-            OneKeyCredentialKind::Password => "password",
-            OneKeyCredentialKind::Key => "key",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Self> {
-        match s {
-            "password" => Some(OneKeyCredentialKind::Password),
-            "key" => Some(OneKeyCredentialKind::Key),
-            _ => None,
-        }
-    }
-}
-
 /// 树节点（folder 或 server），不含 server-only metadata。
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SshNode {
@@ -139,27 +116,6 @@ impl SshServerInfo {
             startup_command: source.startup_command.clone(),
             notes: source.notes.clone(),
             last_connected_at: None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub struct SshOneKeyCredential {
-    pub id: String,
-    pub label: String,
-    pub username: String,
-    pub kind: OneKeyCredentialKind,
-    pub key_path: Option<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-}
-
-impl SshOneKeyCredential {
-    pub fn display_label(&self) -> String {
-        if self.username.is_empty() {
-            self.label.clone()
-        } else {
-            format!("{} ({})", self.label, self.username)
         }
     }
 }

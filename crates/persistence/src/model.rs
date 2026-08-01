@@ -15,7 +15,7 @@ use super::schema::{
     mcp_server_installations, mcp_server_panes, notebook_panes, notebooks, object_actions,
     object_metadata, object_permissions, pane_branches, pane_leaves, pane_nodes, panels,
     project_rules, projects, prompt_trigger_rules, onekey_credentials, server_experiments,
-    settings_panes, ssh_nodes, ssh_onekey_credentials,
+    settings_panes, ssh_nodes,
     ssh_servers, sync_meta, tabs, team_members, team_settings, teams, terminal_panes,
     user_profiles, welcome_panes, windows, workflow_panes, workflows, workspace_teams, workspaces,
 };
@@ -1453,8 +1453,9 @@ pub struct Panel {
 // nullable for root-level entries; `kind` is `'folder'` or `'server'`.
 // Server-only metadata lives in `ssh_servers`. Secrets (password/passphrase)
 // are NOT stored here — they go into the OS keychain keyed by `node_id`.
-// Shared OneKey credentials keep username/label in `ssh_onekey_credentials`;
-// their password also lives in the OS keychain keyed by credential id.
+// Shared OneKey credentials are now managed by the `warp_onekey` crate;
+// the old `ssh_onekey_credentials` table was removed in migration
+// 2026-07-31-000000_onekey_credentials_and_drop_ssh_onekey.
 
 #[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
 #[diesel(table_name = ssh_nodes)]
@@ -1481,34 +1482,10 @@ pub struct NewSshNode<'a> {
     pub sort_order: i32,
 }
 
-#[derive(Identifiable, Queryable, Selectable, Clone, Debug)]
-#[diesel(table_name = ssh_onekey_credentials)]
-#[diesel(primary_key(id))]
-pub struct SshOneKeyCredentialRow {
-    pub id: String,
-    pub label: String,
-    pub username: String,
-    pub kind: String,
-    pub key_path: Option<String>,
-    pub created_at: NaiveDateTime,
-    pub updated_at: NaiveDateTime,
-}
-
-#[derive(Insertable, AsChangeset, Clone, Debug)]
-#[diesel(table_name = ssh_onekey_credentials)]
-pub struct NewSshOneKeyCredential<'a> {
-    pub id: &'a str,
-    pub label: &'a str,
-    pub username: &'a str,
-    pub kind: &'a str,
-    pub key_path: Option<&'a str>,
-}
-
 #[derive(Identifiable, Queryable, Selectable, Associations, Clone, Debug)]
 #[diesel(table_name = ssh_servers)]
 #[diesel(primary_key(node_id))]
 #[diesel(belongs_to(SshNodeRow, foreign_key = node_id))]
-#[diesel(belongs_to(SshOneKeyCredentialRow, foreign_key = credential_id))]
 pub struct SshServerRow {
     pub node_id: String,
     pub host: String,

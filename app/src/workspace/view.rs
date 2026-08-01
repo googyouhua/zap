@@ -5470,27 +5470,25 @@ impl Workspace {
                     }
                 }
             } else {
-                match warp_ssh_manager::with_conn(|conn| {
-                    let resolved_auth = SshRepository::resolve_server_auth(conn, &server)?;
-                    let mut server_for_connection = server.clone();
-                    server_for_connection.username = resolved_auth.username;
-                    server_for_connection.auth_type = resolved_auth.auth_type;
-                    server_for_connection.key_path = resolved_auth.key_path;
-                    Ok((
-                        server_for_connection,
-                        resolved_auth.secret_lookup_id,
-                        resolved_auth.secret_kind,
-                    ))
-                }) {
-                    Ok((server_for_connection, secret_lookup_id, secret_kind)) => {
-                        (server_for_connection, secret_lookup_id, secret_kind, None)
+                match SshRepository::resolve_server_auth(&server) {
+                    Ok(resolved_auth) => {
+                        let mut server_for_connection = server.clone();
+                        server_for_connection.username = resolved_auth.username;
+                        server_for_connection.auth_type = resolved_auth.auth_type;
+                        server_for_connection.key_path = resolved_auth.key_path;
+                        (
+                            server_for_connection,
+                            resolved_auth.secret_lookup_id,
+                            resolved_auth.secret_kind,
+                            None,
+                        )
                     }
                     Err(e) => {
                         log::warn!("ssh auth resolution failed (will continue without injection): {e}");
                         let fallback_kind = match server.auth_type {
                             warp_ssh_manager::AuthType::Password => SecretKind::Password,
                             warp_ssh_manager::AuthType::Key => SecretKind::Passphrase,
-                            warp_ssh_manager::AuthType::OneKey => SecretKind::OneKeyPassword,
+                            warp_ssh_manager::AuthType::OneKey => SecretKind::Password,
                         };
                         (server.clone(), node_id.clone(), fallback_kind, None)
                     }

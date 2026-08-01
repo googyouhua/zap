@@ -119,7 +119,7 @@ fn resolve_sftp_auth(server: &SshServerInfo) -> Result<ResolvedSftpAuth, SftpOps
             password: Some(credential.password),
         });
     }
-    let auth = warp_ssh_manager::with_conn(|conn| Ok(SshRepository::resolve_server_auth(conn, server)?))
+    let auth = SshRepository::resolve_server_auth(server)
         .map_err(|e| SftpOpsError::NoCredentials(format!("解析认证失败: {e}")))?;
     Ok(ResolvedSftpAuth { auth, password: None })
 }

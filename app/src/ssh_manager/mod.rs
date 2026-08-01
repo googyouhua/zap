@@ -5,7 +5,6 @@
 
 pub mod candidates;
 pub mod notifier;
-pub mod onekey;
 pub mod onekey_notifier;
 pub mod panel;
 pub mod password_prompt;
