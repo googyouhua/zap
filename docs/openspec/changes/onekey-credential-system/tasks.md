@@ -44,7 +44,7 @@
 - [ ] 7.1 新建 `app/src/settings_view/onekey_page.rs` 及入口:凭据列表(label/username/kind)
 - [ ] 7.2 实现凭据表单(新增/编辑):label、username、password、kind 选择器、key_path、notes;校验 label/password 必填
 - [ ] 7.3 实现删除确认对话框
-- [ ] 7.4 实现 Trigger Keywords 区块:两组关键词的增删 + 重置为默认
+- [ ] 7.4 实现 Trigger Keywords 区块:两组关键词的增删 + 重置为默认。**依赖:Task 5 的 auto-send 依赖 `list_rules()` 返回非空**;本任务需在无规则时 seed 默认关键词(如 `password`/`passphrase` → password_only,`username`/`login` → username_then_password),否则 auto-send 永不触发(review IMPORTANT-3 遗留)
 - [ ] 7.5 `OneKeyPageView` 订阅通知刷新列表,写入成功后 emit 通知
 - [ ] 7.6 新建 `app/src/ssh_manager/onekey_notifier.rs`(`OneKeyCredentialsChangedNotifier`,SingletonEntity),在 `mod.rs` 导出、`app/src/lib.rs` 注册 singleton
 
