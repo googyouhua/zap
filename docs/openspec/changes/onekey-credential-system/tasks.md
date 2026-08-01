@@ -16,10 +16,10 @@
 
 ## 3. 终端搜索面板
 
-- [ ] 3.1 新建 `app/src/search/onekey/`,实现 `OneKeyPanel`(SearchBar + SearchMixer + 列表状态),复用 ExternalSecretsMenu 模式
-- [ ] 3.2 实现 `OneKeyItem` / 数据源(模糊匹配 label/username)/ `OneKeyPanelEvent::{ ItemSelected { credential, mode }, Close }`
-- [ ] 3.3 实现选中凭据后的发送模式选择 UI("仅发送密码" / "先用户名再密码")
-- [ ] 3.4 注册快捷键 `ToggleOneKeyPanel`(`ctrl+shift+k` / macOS `cmd+shift+k`),确认无按键冲突
+- [x] 3.1 新建 `app/src/search/onekey/`,实现 `OneKeyPanel`(SearchBar + SearchMixer + 列表状态),复用 ExternalSecretsMenu 模式
+- [x] 3.2 实现 `OneKeyItem` / 数据源(模糊匹配 label/username)/ `OneKeyPanelEvent::{ ItemSelected { credential, mode }, Close }`
+- [x] 3.3 实现选中凭据后的发送模式选择 UI("仅发送密码" / "先用户名再密码")
+- [x] 3.4 注册快捷键 `ToggleOneKeyPanel`(`ctrl+shift+k` / macOS `cmd+shift+k`),确认无按键冲突
 
 ## 4. 发送引擎
 

@@ -428,7 +428,7 @@ git commit -m "feat: 注册 OneKeyInput feature flag、数据库路径与变更�
 
 REF: `.worktrees/feature/20260719/quick-credential-input/app/src/search/onekey/` 全部文件。
 
-- [ ] **Step 3.1:面板模块骨架**
+- [x] **Step 3.1:面板模块骨架**
 
 - `app/src/search/mod.rs` 在 `pub mod external_secrets;`(10 行)附近追加 `pub mod onekey;`。
 - 创建 `app/src/search/onekey/mod.rs`,逐字拷贝参考分支:
@@ -456,13 +456,13 @@ pub enum OneKeySearchItemAction {
 }
 ```
 
-- [ ] **Step 3.2:数据源 + 搜索项**
+- [x] **Step 3.2:数据源 + 搜索项**
 
 - 创建 `app/src/search/onekey/search_item.rs`,逐字拷贝参考分支:`OneKeySearchItem` 实现 `SearchItem`(icon 用 `Icon::Key`,label + username 两行,`accessibility_label` 为 `Credential: <label> (<username>)`)。
 - 创建 `app/src/search/onekey/data_source.rs`,逐字拷贝参考分支:`OneKeyDataSource::new()` 调 `warp_onekey::find_all()`,`run_query` 用 `fuzzy_match::match_indices_case_insensitive` 过滤 label/username,空 query 返回全部。
 - 创建 `app/src/search/onekey/data_source_tests.rs`,逐字拷贝参考分支(6 个过滤单测,走 `filter_credentials` 纯函数)。
 
-- [ ] **Step 3.3:面板主视图(view.rs)**
+- [x] **Step 3.3:面板主视图(view.rs)**
 
 创建 `app/src/search/onekey/view.rs`,逐字拷贝参考分支(529 行)。它包含:
 - `PanelMode::{Searching, SendModeSelection { credential }}`
@@ -474,7 +474,7 @@ pub enum OneKeySearchItemAction {
 
 > 样式来自 `crate::search::external_secrets::view::styles`,main 已有该模块(`app/src/search/external_secrets/view.rs:368` `pub mod styles`),无需改动。
 
-- [ ] **Step 3.4:验证 + Commit**
+- [x] **Step 3.4:验证 + Commit**
 
 Run: `cargo check -p warp`
 Expected: 编译通过(面板尚未被任何视图引用,可能触发 `dead_code` 警告——若出现,属预期,Task 4 接线后消除)。
