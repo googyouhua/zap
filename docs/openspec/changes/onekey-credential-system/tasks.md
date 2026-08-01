@@ -35,9 +35,9 @@
 
 ## 6. SSH 面板数据源切换
 
-- [ ] 6.1 `server_view.rs`:OneKey overlay 增删改 API 从 `SshRepository::*_onekey_credential` 切到 `warp_onekey::*`,UI 渲染不变
-- [ ] 6.2 `workspace/view.rs` 与 `sftp_manager/sftp_ops.rs`:`auth_type == OneKey` 时直接 `warp_onekey::find_by_id()` 解析认证
-- [ ] 6.3 `SshServerView` 订阅 `OneKeyCredentialsChangedNotifier`,`on_save/on_delete_managed_onekey_credential` 成功后 emit 通知
+- [x] 6.1 `server_view.rs`:OneKey overlay 增删改 API 从 `SshRepository::*_onekey_credential` 切到 `warp_onekey::*`,UI 渲染不变
+- [x] 6.2 `workspace/view.rs` 与 `sftp_manager/sftp_ops.rs`:`auth_type == OneKey` 时直接 `warp_onekey::find_by_id()` 解析认证
+- [x] 6.3 `SshServerView` 订阅 `OneKeyCredentialsChangedNotifier`,`on_save/on_delete_managed_onekey_credential` 成功后 emit 通知
 
 ## 7. 设置页 OneKeyPage
 

@@ -946,7 +946,7 @@ git commit -m "feat: PTY 密码提示接入 classify_prompt 规则分类与 auto
 
 REF: `.worktrees/feature/20260719/quick-credential-input/app/src/ssh_manager/server_view.rs`(CRUD 切换 1023/1034/1075、notifier 订阅 300-308、reload 368/550、刷新按钮 1755-1771/2024)、`workspace/view.rs:5444-5468`、`sftp_manager/sftp_ops.rs:86-104`、`crates/onekey/src/repository.rs`。
 
-- [ ] **Step 6.1:替换 OneKey overlay 的数据类型与 CRUD**
+- [x] **Step 6.1:替换 OneKey overlay 的数据类型与 CRUD**
 
 `app/src/ssh_manager/server_view.rs` 中,OneKey overlay 的渲染代码**不动**,只替换数据与 CRUD(design doc Decision 6):
 
@@ -960,12 +960,12 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/ssh_manager/ser
    - 成功后:更新 `managed_onekey_credential_id`/`selected_onekey_credential_id`、`reload_onekey_credentials(ctx)`、emit 通知(参考分支 1052-1057 行)。
 5. `on_delete_managed_onekey_credential`(1072 行):`SshRepository::delete_onekey_credential(conn, &id)?` → `warp_onekey::delete(&id)`(去掉 `with_conn`),成功后 emit 通知(参考分支 1075-1089 行)。
 
-- [ ] **Step 6.2:SSH 连接认证解析走 find_by_id**
+- [x] **Step 6.2:SSH 连接认证解析走 find_by_id**
 
 - `app/src/workspace/view.rs` 的 SSH 连接认证解析(约 5448-5492 行):把 `AuthType::OneKey` 分支改为直接 `warp_onekey::find_by_id(&server.credential_id)`,命中后用凭据的 username/password 覆盖 `server_for_connection`(`auth_type = AuthType::Password`,secret_lookup 用 credential_id,`secret_kind = SecretKind::Password`),未命中回落现有 fallback(逐字参考分支 5449-5468 行)。
 - `app/src/sftp_manager/sftp_ops.rs` 的 `resolve_sftp_auth`(86-104 行):`auth_type == OneKey` 时 `warp_onekey::find_by_id(...)` 返回 `ResolvedSshAuth { username: credential.username, auth_type: AuthType::Password, key_path: credential.key_path, secret_lookup_id: credential_id, secret_kind: SecretKind::Password }`,错误映射为 `SftpOpsError::NoCredentials`(逐字参考分支 86-104 行)。
 
-- [ ] **Step 6.3:订阅 notifier + 打开时 reload + 刷新按钮**
+- [x] **Step 6.3:订阅 notifier + 打开时 reload + 刷新按钮**
 
 1. `new()` 中订阅 `OneKeyCredentialsChangedNotifier`,收到 `CredentialsChanged` 后 `reload_onekey_credentials(ctx)` + `ctx.notify()`(参考分支 300-308 行)。
 2. `OpenOneKeyManager` action 中确保打开时 `reload_onekey_credentials(ctx)`(参考分支 commit "OneKey Manager overlay now reloads credentials on open";在现有 open 处理里补一次 reload)。
@@ -977,7 +977,7 @@ REF: `.worktrees/feature/20260719/quick-credential-input/app/src/ssh_manager/ser
 
 > `server_view.rs` 中其它仍引用 `SshRepository`/`KeychainSecretStore` 的既有逻辑(server 表单保存等)保持不变;OneKey overlay 的渲染段(下拉、表单、列表行、删除确认)一行动都不动。
 
-- [ ] **Step 6.4:验证 + Commit**
+- [x] **Step 6.4:验证 + Commit**
 
 Run: `cargo check -p warp`
 Expected: 编译通过(仍可能有 `SshRepository::*_onekey_credential` 相关 dead_code,Task 8 删除)。
