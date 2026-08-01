@@ -15610,7 +15610,9 @@ impl TerminalView {
                     AuthType::Key => (SecretKind::Passphrase, OneKeyCredentialKind::Passphrase),
                     AuthType::OneKey => continue,
                 };
-                let Some(secret) = store.get(&node.id, secret_kind)? else {
+                // keychain 不可用(NoBackend / keyring 错误)时跳过该服务器凭据,
+                // 不影响已从 warp_onekey::find_all() 收集的 OneKey 凭据。
+                let Some(secret) = store.get(&node.id, secret_kind).ok().flatten() else {
                     continue;
                 };
                 if secret.is_empty() {

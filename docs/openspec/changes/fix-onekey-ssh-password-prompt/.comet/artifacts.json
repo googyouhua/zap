@@ -1,0 +1,5 @@
+{
+  "openspec_proposal": "docs/openspec/changes/fix-onekey-ssh-password-prompt/proposal.md",
+  "openspec_design": "docs/openspec/changes/fix-onekey-ssh-password-prompt/design.md",
+  "openspec_tasks": "docs/openspec/changes/fix-onekey-ssh-password-prompt/tasks.md"
+}
