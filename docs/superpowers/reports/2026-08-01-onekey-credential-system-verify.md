@@ -195,9 +195,18 @@
 
 **处理方式**:返回 build 阶段,按 subagent-driven-development 补实现任务修复 W1/W2/W4,同步文档(S1/S2/W3 文本)。
 
+## 修复轮结果(round 1, commit `30de871a`)
+
+- **W1 ✅**:`onekey_sender.rs:14-19` PasswordOnly 分支改用 `clear_line_editor_and_write_to_pty` 先清行再写密码。
+- **W2 ✅**:`onekey_page.rs` SaveForm 增加 `form_error` 校验:AddForm label/password 非空("Label is required"/"Password is required");EditForm label 非空、密码为空保持原密码不覆盖(顺带修复 M-3)。
+- **W4 ✅**:`password_prompt.rs` 新增 `ONEKEY_PROMPT_PATTERN`(password|passphrase|login|username|user|name|email|account)+ `bytes_look_like_onekey_prompt` 供 onekey 滑窗使用;`view.rs:7439` 切换调用。SSH 注入与 su 路径仍用严格正则,不受影响。
+- **W3(接受)**:spec 文本已注明"默认关键词在首次打开设置页时 seed"。
+- **S1 ✅** design.md 迁移描述双轨;**S2 ✅** proposal/design/spec 快捷键改为 `cmd_or_ctrl_shift("u")`。
+- 验证:`cargo check -p warp` 全绿;`cargo test -p warp --lib password_prompt` 12/12、`onekey_sender` 4/4 通过。
+
 ## 最终评估
 
-**0 CRITICAL;5 WARNING;6 SUGGESTION。用户裁决 W1/W2/W4 修复、W3 接受并同步文档后,进入 build 修复轮。**
+**0 CRITICAL;4 WARNING 已修复(W1/W2/W4),W3 接受并同步文档;文档过期 S1/S2 已同步。Ready for archive。**
 
 - 实现质量高:存储层与权威参考分支 1:1 对齐;auto-send 相对参考的「死代码 → 生产接入」改进落地;旧系统删除干净;notifier 跨视图刷新、su_root Password-only 过滤、SSH/SFTP `find_by_id` 认证均正确实现。`cargo check` 全绿。
 - W1–W4 属 spec/代码行为偏差(其中 W1/W3/W4 与权威参考一致,主要矛盾在 spec/design 文本未同步,仅 W2 是真实功能缺失)。按「降级原则」均未升为 CRITICAL。
