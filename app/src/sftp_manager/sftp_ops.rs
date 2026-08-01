@@ -10,6 +10,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
+use zeroize::Zeroizing;
+
 use warp_ssh_manager::SshRepository;
 use warp_ssh_manager::secrets::SshSecretStore;
 use warp_ssh_manager::types::{AuthType, ResolvedSshAuth, SshServerInfo};
@@ -65,24 +67,40 @@ pub type ProgressCallback = Box<dyn Fn(u64, u64) + Send>;
 /// 连接超时时间
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// SFTP 认证解析结果。
+///
+/// OneKey 凭据的密码存在 `zap.onekey`,不走 `SshSecretStore`,由
+/// `password` 字段直接携带明文;其余认证类型为 `None`,交给
+/// `build_auth_method` 通过 `secret_lookup_id` / `secret_kind` 读取 secret store。
+struct ResolvedSftpAuth {
+    auth: ResolvedSshAuth,
+    password: Option<Zeroizing<String>>,
+}
+
 /// 使用服务器配置建立 SFTP 连接
 pub fn connect_from_server(
     server: &SshServerInfo,
     secret_store: &dyn SshSecretStore,
 ) -> Result<SftpSession, SftpOpsError> {
     let resolved_auth = resolve_sftp_auth(server)?;
-    let auth = build_auth_method(server, &resolved_auth, secret_store)?;
+    let auth = if let Some(password) = resolved_auth.password.as_ref() {
+        AuthMethod::Password {
+            password: password.to_string(),
+        }
+    } else {
+        build_auth_method(server, &resolved_auth.auth, secret_store)?
+    };
     SftpSession::connect(
         &server.host,
         server.port,
-        &resolved_auth.username,
+        &resolved_auth.auth.username,
         auth,
         Some(CONNECT_TIMEOUT),
     )
     .map_err(|e| SftpOpsError::Connection(e.to_string()))
 }
 
-fn resolve_sftp_auth(server: &SshServerInfo) -> Result<ResolvedSshAuth, SftpOpsError> {
+fn resolve_sftp_auth(server: &SshServerInfo) -> Result<ResolvedSftpAuth, SftpOpsError> {
     if server.auth_type == AuthType::OneKey {
         let credential_id = server.credential_id.as_deref().ok_or_else(|| {
             SftpOpsError::NoCredentials("OneKey credential_id is missing".to_string())
@@ -90,16 +108,20 @@ fn resolve_sftp_auth(server: &SshServerInfo) -> Result<ResolvedSshAuth, SftpOpsE
         let credential = warp_onekey::find_by_id(credential_id)
             .map_err(|e| SftpOpsError::NoCredentials(format!("OneKey lookup error: {e}")))?
             .ok_or_else(|| SftpOpsError::NoCredentials("OneKey credential not found".to_string()))?;
-        return Ok(ResolvedSshAuth {
-            username: credential.username,
-            auth_type: AuthType::Password,
-            key_path: credential.key_path.clone(),
-            secret_lookup_id: credential_id.to_string(),
-            secret_kind: SecretKind::Password,
+        return Ok(ResolvedSftpAuth {
+            auth: ResolvedSshAuth {
+                username: credential.username,
+                auth_type: AuthType::Password,
+                key_path: credential.key_path.clone(),
+                secret_lookup_id: credential_id.to_string(),
+                secret_kind: SecretKind::Password,
+            },
+            password: Some(credential.password),
         });
     }
-    warp_ssh_manager::with_conn(|conn| Ok(SshRepository::resolve_server_auth(conn, server)?))
-        .map_err(|e| SftpOpsError::NoCredentials(format!("解析认证失败: {e}")))
+    let auth = warp_ssh_manager::with_conn(|conn| Ok(SshRepository::resolve_server_auth(conn, server)?))
+        .map_err(|e| SftpOpsError::NoCredentials(format!("解析认证失败: {e}")))?;
+    Ok(ResolvedSftpAuth { auth, password: None })
 }
 
 /// 列出远程目录内容，转换为 UI 层 FileEntry
@@ -604,6 +626,73 @@ mod tests {
         let sftp_err = zap_sftp::SftpError::General("test error".into());
         let ops_err: SftpOpsError = sftp_err.into();
         assert!(matches!(ops_err, SftpOpsError::Operation(_)));
+    }
+
+    // ==================== resolve_sftp_auth OneKey 分支测试 ====================
+
+    /// OneKey 服务器缺 credential_id 应报 NoCredentials
+    #[test]
+    fn test_resolve_sftp_auth_onekey_missing_credential_id() {
+        let mut server = SshServerInfo::new_default("node-missing-id".into());
+        server.auth_type = AuthType::OneKey;
+        server.credential_id = None;
+        let err = resolve_sftp_auth(&server)
+            .err()
+            .expect("OneKey 缺 credential_id 应返回错误");
+        assert!(matches!(
+            err,
+            SftpOpsError::NoCredentials(msg) if msg.contains("credential_id is missing")
+        ));
+    }
+
+    /// OneKey 凭据不存在应报 NoCredentials
+    #[test]
+    fn test_resolve_sftp_auth_onekey_credential_not_found() {
+        let _ = warp_onekey::set_database_path(
+            std::env::temp_dir().join("warp_onekey_sftp_ops_test.sqlite"),
+        );
+        let mut server = SshServerInfo::new_default("node-not-found".into());
+        server.auth_type = AuthType::OneKey;
+        server.credential_id = Some("non-existent-credential-id".into());
+        let err = resolve_sftp_auth(&server)
+            .err()
+            .expect("OneKey 凭据不存在应返回错误");
+        assert!(matches!(
+            err,
+            SftpOpsError::NoCredentials(msg) if msg.contains("not found")
+        ));
+    }
+
+    /// OneKey 凭据命中时应直接携带明文密码,不依赖 secret store
+    #[test]
+    fn test_resolve_sftp_auth_onekey_success() {
+        let _ = warp_onekey::set_database_path(
+            std::env::temp_dir().join("warp_onekey_sftp_ops_test.sqlite"),
+        );
+        let credential = warp_onekey::OneKeyCredential {
+            id: String::new(),
+            label: "测试凭据".into(),
+            username: "alice".into(),
+            notes: String::new(),
+            password: Zeroizing::new("s3cret".into()),
+            kind: warp_onekey::OneKeyKind::Password,
+            key_path: None,
+        };
+        let created = warp_onekey::create(&credential).expect("创建 OneKey 凭据失败");
+        let mut server = SshServerInfo::new_default("node-success".into());
+        server.auth_type = AuthType::OneKey;
+        server.credential_id = Some(created.id.clone());
+        let resolved = resolve_sftp_auth(&server)
+            .ok()
+            .expect("应成功解析 OneKey SFTP 认证");
+        assert_eq!(resolved.auth.username, "alice");
+        assert_eq!(resolved.auth.secret_lookup_id, created.id);
+        assert_eq!(resolved.auth.secret_kind, SecretKind::Password);
+        let password = resolved
+            .password
+            .as_ref()
+            .expect("OneKey 分支应携带明文密码");
+        assert_eq!(password.as_str(), "s3cret");
     }
 
     /// 测试 shellexpand_path 展开 ~/ 路径

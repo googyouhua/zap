@@ -5445,20 +5445,28 @@ impl Workspace {
             AuthType, KeychainSecretStore, SecretKind, SshRepository, SshSecretStore,
         };
 
-        let (server_for_connection, secret_lookup_id, secret_kind) =
+        let (server_for_connection, secret_lookup_id, secret_kind, pre_resolved_secret) =
             if server.auth_type == AuthType::OneKey {
                 let credential_id = server.credential_id.clone().unwrap_or_default();
                 match warp_onekey::find_by_id(&credential_id) {
                     Ok(Some(credential)) => {
                         let mut server_for_connection = server.clone();
                         server_for_connection.username = credential.username;
-                        server_for_connection.auth_type = AuthType::Password;
+                        server_for_connection.auth_type = match credential.kind {
+                            warp_onekey::OneKeyKind::Password => AuthType::Password,
+                            warp_onekey::OneKeyKind::Key => AuthType::Key,
+                        };
                         server_for_connection.key_path = credential.key_path.clone();
-                        (server_for_connection, credential_id, SecretKind::Password)
+                        (
+                            server_for_connection,
+                            credential_id,
+                            SecretKind::Password,
+                            Some(credential.password.clone()),
+                        )
                     }
                     _ => {
                         log::warn!("OneKey credential not found or lookup failed, falling back");
-                        (server.clone(), node_id.clone(), SecretKind::Password)
+                        (server.clone(), node_id.clone(), SecretKind::Password, None)
                     }
                 }
             } else {
@@ -5474,7 +5482,9 @@ impl Workspace {
                         resolved_auth.secret_kind,
                     ))
                 }) {
-                    Ok(resolved) => resolved,
+                    Ok((server_for_connection, secret_lookup_id, secret_kind)) => {
+                        (server_for_connection, secret_lookup_id, secret_kind, None)
+                    }
                     Err(e) => {
                         log::warn!("ssh auth resolution failed (will continue without injection): {e}");
                         let fallback_kind = match server.auth_type {
@@ -5482,7 +5492,7 @@ impl Workspace {
                             warp_ssh_manager::AuthType::Key => SecretKind::Passphrase,
                             warp_ssh_manager::AuthType::OneKey => SecretKind::OneKeyPassword,
                         };
-                        (server.clone(), node_id.clone(), fallback_kind)
+                        (server.clone(), node_id.clone(), fallback_kind, None)
                     }
                 }
             };
@@ -5518,13 +5528,17 @@ impl Workspace {
             });
         }
 
-        // 1. 同步读 keychain(主线程 OK)。OneKey server 会使用共享凭据 id。
-        let secret = match KeychainSecretStore.get(&secret_lookup_id, secret_kind) {
-            Ok(opt) => opt.unwrap_or_else(|| zeroize::Zeroizing::new(String::new())),
-            Err(e) => {
-                log::warn!("ssh keychain read failed (will continue without injection): {e}");
-                zeroize::Zeroizing::new(String::new())
-            }
+        // 1. 同步读 keychain(主线程 OK)。OneKey server 的密码在 `zap.onekey`,
+        //    已由 `warp_onekey::find_by_id` 解析出明文,直接使用,不走 keychain。
+        let secret = match pre_resolved_secret {
+            Some(secret) => secret,
+            None => match KeychainSecretStore.get(&secret_lookup_id, secret_kind) {
+                Ok(opt) => opt.unwrap_or_else(|| zeroize::Zeroizing::new(String::new())),
+                Err(e) => {
+                    log::warn!("ssh keychain read failed (will continue without injection): {e}");
+                    zeroize::Zeroizing::new(String::new())
+                }
+            },
         };
 
         // 2. 注入器 spawn 必须在 execute_command 之前启动 — 否则 password prompt
