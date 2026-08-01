@@ -56,6 +56,8 @@ use crate::ai::predict::prompt_suggestions::{
     is_accept_prompt_suggestion_bound_to_ctrl_enter,
 };
 use crate::search::slash_command_menu::static_commands::commands;
+#[cfg(feature = "onekey_input")]
+use crate::search::onekey::{OneKeyPanel, OneKeyPanelEvent};
 use crate::ssh_manager::onekey::{load_saved_ssh_credentials, OneKeyCredentialKind};
 use crate::ssh_manager::password_prompt::bytes_look_like_password_prompt;
 use crate::terminal::input::inline_menu::InlineMenuPositioner;
@@ -2339,6 +2341,11 @@ pub struct TerminalView {
     pub(crate) su_root_password: Option<zeroize::Zeroizing<String>>,
     su_root_onekey_candidates: Vec<usize>,
 
+    #[cfg(feature = "onekey_input")]
+    onekey_panel: Option<ViewHandle<OneKeyPanel>>,
+    #[cfg(feature = "onekey_input")]
+    onekey_panel_open: bool,
+
     /// The search bar at the top of the terminal view.
     find_bar: ViewHandle<Find<TerminalFindModel>>,
 
@@ -3770,6 +3777,17 @@ impl TerminalView {
             Self::spawn_onekey_prompt_listener(onekey_pty_reads_rx, ctx);
         }
 
+        #[cfg(feature = "onekey_input")]
+        let onekey_panel_handle = if FeatureFlag::OneKeyInput.is_enabled() {
+            let panel = ctx.add_typed_action_view(|ctx| {
+                crate::search::onekey::OneKeyPanel::new(ctx)
+            });
+            ctx.subscribe_to_view(&panel, Self::on_onekey_panel_event);
+            Some(panel)
+        } else {
+            None
+        };
+
         // Here we initialize the block list mouse states for block zero.
         // Afterwards, we initialize all block list mouse states for a block when the
         // previous block sends a `BlockCompleted` event.
@@ -3866,6 +3884,10 @@ impl TerminalView {
             ssh_secret_auto_injection_in_flight: false,
             su_root_password: None,
             su_root_onekey_candidates: Vec::new(),
+            #[cfg(feature = "onekey_input")]
+            onekey_panel: onekey_panel_handle,
+            #[cfg(feature = "onekey_input")]
+            onekey_panel_open: false,
             context_menu,
             hovered_secret: None,
             open_secret_tool_tip: None,
@@ -7469,7 +7491,7 @@ impl TerminalView {
     }
 
     /// Ends the current line before writing the given bytes to the PTY.
-    fn clear_line_editor_and_write_to_pty<B: Into<Cow<'static, [u8]>>>(
+    pub(crate) fn clear_line_editor_and_write_to_pty<B: Into<Cow<'static, [u8]>>>(
         &mut self,
         data: B,
         ctx: &mut ViewContext<Self>,
@@ -15745,6 +15767,30 @@ impl TerminalView {
         self.close_context_menu(ctx, true);
     }
 
+    #[cfg(feature = "onekey_input")]
+    fn on_onekey_panel_event(
+        &mut self,
+        _panel: ViewHandle<OneKeyPanel>,
+        event: &OneKeyPanelEvent,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        match event {
+            OneKeyPanelEvent::ItemSelected { credential, mode } => {
+                crate::terminal::onekey_sender::send_onekey_credential(
+                    self,
+                    credential,
+                    *mode,
+                    ctx,
+                );
+                self.onekey_panel_open = false;
+            }
+            OneKeyPanelEvent::Close => {
+                self.onekey_panel_open = false;
+            }
+            OneKeyPanelEvent::Open => {}
+        }
+    }
+
     pub(crate) fn note_ssh_secret_auto_injected(&mut self, ctx: &mut ViewContext<Self>) {
         self.onekey_last_prompt_at = Some(Instant::now());
         if matches!(
@@ -23677,6 +23723,8 @@ impl TypedActionView for TerminalView {
             | RevealChildAgent { .. }
             | OpenCLIAgentRichInput
             | ToggleSessionRecording => Empty,
+            #[cfg(feature = "onekey_input")]
+            ToggleOneKeyPanel => Empty,
         }
     }
 
@@ -23818,6 +23866,16 @@ impl TypedActionView for TerminalView {
             OneKeyFillSecret { index } => self.fill_onekey_secret(*index, ctx),
             SuRootFillRootPassword => self.fill_su_root_password(ctx),
             SuRootFillOneKeyPassword { index } => self.fill_su_root_onekey_password(*index, ctx),
+            #[cfg(feature = "onekey_input")]
+            ToggleOneKeyPanel => {
+                self.onekey_panel_open = !self.onekey_panel_open;
+                if self.onekey_panel_open {
+                    if let Some(panel) = &self.onekey_panel {
+                        ctx.focus(panel);
+                    }
+                }
+                ctx.notify();
+            }
             Paste => self.paste(false, ctx),
             Copy => self.copy(ctx),
             CopyOutputs => self.copy_outputs(ctx),
@@ -24918,6 +24976,13 @@ impl View for TerminalView {
                     ChildAnchor::TopRight,
                 ),
             );
+        }
+
+        #[cfg(feature = "onekey_input")]
+        if self.onekey_panel_open {
+            if let Some(panel) = &self.onekey_panel {
+                stack.add_child(Align::new(ChildView::new(panel).finish()).finish());
+            }
         }
 
         if let Some(reconnecting_banner) = self

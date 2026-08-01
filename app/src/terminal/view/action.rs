@@ -169,6 +169,8 @@ pub enum TerminalAction {
     SuRootFillOneKeyPassword {
         index: usize,
     },
+    #[cfg(feature = "onekey_input")]
+    ToggleOneKeyPanel,
     Paste,
     Copy,
     CopyOutputs,
@@ -464,6 +466,8 @@ impl fmt::Debug for TerminalAction {
             SuRootFillOneKeyPassword { index } => {
                 write!(f, "SuRootFillOneKeyPassword {{ index: {index} }}")
             }
+            #[cfg(feature = "onekey_input")]
+            ToggleOneKeyPanel => write!(f, "ToggleOneKeyPanel"),
             Paste => f.write_str("Paste"),
             Copy => f.write_str("Copy"),
             CopyOutputs => f.write_str("CopyOutputs"),
