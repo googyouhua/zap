@@ -23982,6 +23982,7 @@ impl TypedActionView for TerminalView {
                 self.onekey_panel_open = !self.onekey_panel_open;
                 if self.onekey_panel_open {
                     if let Some(panel) = &self.onekey_panel {
+                        panel.update(ctx, |panel, ctx| panel.setup(ctx));
                         ctx.focus(panel);
                     }
                 }
