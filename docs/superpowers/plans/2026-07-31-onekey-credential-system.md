@@ -501,7 +501,7 @@ git commit -m "feat: 实现终端 OneKey 搜索面板(SearchBar + SearchMixer)"
 
 REF: `.worktrees/feature/20260719/quick-credential-input/app/src/terminal/onekey_sender.rs`、`onekey_sender_tests.rs`、`view/action.rs`(ToggleOneKeyPanel)、`view/init.rs:579-586`、`view.rs`(字段 2327-2330、创建 3756-3762、事件 15483-15505、action 23547-23556、render 24659-24664)。
 
-- [ ] **Step 4.1:发送引擎**
+- [x] **Step 4.1:发送引擎**
 
 创建 `app/src/terminal/onekey_sender.rs`,逐字拷贝参考分支:
 
@@ -550,11 +550,11 @@ mod tests;
 
 创建 `app/src/terminal/onekey_sender_tests.rs`,逐字拷贝参考分支(4 个 SendMode 冒烟测试)。
 
-- [ ] **Step 4.2:把 clear_line_editor_and_write_to_pty 改为 pub(crate)**
+- [x] **Step 4.2:把 clear_line_editor_and_write_to_pty 改为 pub(crate)**
 
 `app/src/terminal/view.rs:7472` 的 `fn clear_line_editor_and_write_to_pty` 改为 `pub(crate) fn clear_line_editor_and_write_to_pty`(参考分支 7435 行即为 `pub(crate)`)。`write_to_pty` 已是 `pub(crate)`(7376 行),无需改。
 
-- [ ] **Step 4.3:新增 TerminalAction::ToggleOneKeyPanel**
+- [x] **Step 4.3:新增 TerminalAction::ToggleOneKeyPanel**
 
 在 `app/src/terminal/view/action.rs` 的 `SuRootFillOneKeyPassword { index }`(166-168 行)后追加(参考分支 169-170 行):
 
@@ -570,7 +570,7 @@ mod tests;
             ToggleOneKeyPanel => write!(f, "ToggleOneKeyPanel"),
 ```
 
-- [ ] **Step 4.4:注册快捷键 cmd_or_ctrl_shift("u")**
+- [x] **Step 4.4:注册快捷键 cmd_or_ctrl_shift("u")**
 
 在 `app/src/terminal/view/init.rs` 的可编辑绑定数组末尾(参考分支 579-586 行),`#[cfg(feature = "onekey_input")]` 追加:
 
@@ -589,7 +589,7 @@ mod tests;
 
 **核对固定绑定冲突**(design doc 风险 4):`cmd_or_ctrl_shift("u")` 目前未被任何固定/可编辑绑定占用(main 上 ClearBuffer 是 `ctrl+shift+k`,互不冲突);若 `cmd_or_ctrl_shift("u")` 在别处(如 `app/src/terminal/input.rs`)已有用途,则换一个未被占用的按键并同步更新本计划。
 
-- [ ] **Step 4.5:新增 i18n key**
+- [x] **Step 4.5:新增 i18n key**
 
 在 `app/i18n/en/warp.ftl`、`app/i18n/zh-CN/warp.ftl` 追加(参考分支同 key):
 
@@ -602,7 +602,7 @@ keybinding-desc-terminal-toggle-onekey-panel = 切换 OneKey 凭据面板
 
 > `ja/warp.ftl` 中参考分支未加此 key(缺失时 `t!` 回落返回 key 本身),如要补齐可加 `keybinding-desc-terminal-toggle-onekey-panel = OneKey クレデンシャルパネルを切り替え`。保持与参考分支一致即可。
 
-- [ ] **Step 4.6:TerminalView 字段 + 创建面板**
+- [x] **Step 4.6:TerminalView 字段 + 创建面板**
 
 在 `app/src/terminal/view.rs`:
 1. 顶部 import(参考分支 59-62 行),放在现有 `use crate::search::slash_command_menu::...` 之后:
@@ -645,7 +645,7 @@ use warp_onekey;
             onekey_panel_open: false,
 ```
 
-- [ ] **Step 4.7:面板事件路由到发送引擎**
+- [x] **Step 4.7:面板事件路由到发送引擎**
 
 在 `app/src/terminal/view.rs` 中新增 `on_onekey_panel_event`(参考分支 15483-15505 行):
 
@@ -675,7 +675,7 @@ use warp_onekey;
     }
 ```
 
-- [ ] **Step 4.8:action 处理 + render 定位渲染**
+- [x] **Step 4.8:action 处理 + render 定位渲染**
 
 1. `handle_action` 的 `match action` 中追加(参考分支 23547-23556 行):
 
@@ -710,7 +710,7 @@ use warp_onekey;
         }
 ```
 
-- [ ] **Step 4.9:验证 + Commit**
+- [x] **Step 4.9:验证 + Commit**
 
 Run: `cargo check -p warp`
 Expected: 编译通过,无 dead_code 警告(面板已接线)。

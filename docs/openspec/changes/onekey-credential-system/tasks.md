@@ -19,13 +19,13 @@
 - [x] 3.1 新建 `app/src/search/onekey/`,实现 `OneKeyPanel`(SearchBar + SearchMixer + 列表状态),复用 ExternalSecretsMenu 模式
 - [x] 3.2 实现 `OneKeyItem` / 数据源(模糊匹配 label/username)/ `OneKeyPanelEvent::{ ItemSelected { credential, mode }, Close }`
 - [x] 3.3 实现选中凭据后的发送模式选择 UI("仅发送密码" / "先用户名再密码")
-- [ ] 3.4 注册快捷键 `ToggleOneKeyPanel`(`cmd_or_ctrl_shift("u")`),确认无按键冲突
+- [x] 3.4 注册快捷键 `ToggleOneKeyPanel`(`cmd_or_ctrl_shift("u")`),确认无按键冲突
 
 ## 4. 发送引擎
 
-- [ ] 4.1 实现 `send_credential()`:清行 → 写 `secret\n`;`UsernameThenPassword` 先写 `username\n`,~150ms 后写 `password\n`
-- [ ] 4.2 全程使用 `Zeroizing<String>` 持有 secret
-- [ ] 4.3 在 `TerminalView` 中创建面板实例、订阅事件并路由到发送引擎,`render()` 中定位渲染
+- [x] 4.1 实现 `send_credential()`:清行 → 写 `secret\n`;`UsernameThenPassword` 先写 `username\n`,~150ms 后写 `password\n`
+- [x] 4.2 全程使用 `Zeroizing<String>` 持有 secret
+- [x] 4.3 在 `TerminalView` 中创建面板实例、订阅事件并路由到发送引擎,`render()` 中定位渲染
 
 ## 5. PTY auto-send 扩展
 
